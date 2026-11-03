@@ -199,3 +199,34 @@ export async function fetchDeploymentStatus(): Promise<DeploymentStatus> {
   return res.json();
 }
 
+export async function fetchGitHistory(): Promise<{
+  commits: Array<{
+    hash: string;
+    shortHash: string;
+    message: string;
+    author_name: string;
+    date: string;
+  }>;
+}> {
+  const res = await fetch(`${API_BASE}/git/history`);
+  return res.json();
+}
+
+export async function rollbackGitContent(commitHash: string): Promise<{
+  success: boolean;
+  commitHash: string;
+  restoredTo: string;
+  newCommitHash: string;
+}> {
+  const res = await fetch(`${API_BASE}/git/rollback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ commitHash }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw data;
+  }
+  return data;
+}
+

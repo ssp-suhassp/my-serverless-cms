@@ -20,7 +20,22 @@ export type {
   FeatureItem,
 };
 
-export type StudioTab = 'posts' | 'pages' | 'media' | 'settings';
+export type StudioTab = 'posts' | 'pages' | 'media' | 'history' | 'settings';
+
+export interface GitCommit {
+  hash: string;
+  shortHash: string;
+  message: string;
+  author_name: string;
+  date: string;
+}
+
+export interface RollbackResponse {
+  success: boolean;
+  commitHash: string;
+  restoredTo: string;
+  newCommitHash: string;
+}
 
 export interface PostItem {
   slug: string;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Topbar } from './components/Topbar';
 import { PublishModal } from './components/PublishModal';
+import { HistoryModal } from './components/HistoryModal';
 import { PostsView } from './components/PostsView';
 import { PagesView } from './components/PagesView';
 import { MediaView } from './components/MediaView';
@@ -14,6 +15,8 @@ export const App: React.FC = () => {
   const [deploymentStatus, setDeploymentStatus] = useState<DeploymentStatus | null>(null);
   const [userConfig, setUserConfig] = useState<UserConfig | null>(null);
   const [isPublishOpen, setIsPublishOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [contentKey, setContentKey] = useState(0);
 
   const refreshAllStatus = async () => {
     try {
@@ -31,6 +34,11 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleRollbackComplete = async () => {
+    await refreshAllStatus();
+    setContentKey((prev) => prev + 1);
+  };
+
   useEffect(() => {
     refreshAllStatus();
     const interval = setInterval(refreshAllStatus, 10000);
@@ -46,9 +54,10 @@ export const App: React.FC = () => {
         deploymentStatus={deploymentStatus}
         userConfig={userConfig}
         onOpenPublish={() => setIsPublishOpen(true)}
+        onOpenHistory={() => setIsHistoryOpen(true)}
       />
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden" key={contentKey}>
         {currentTab === 'posts' && <PostsView />}
         {currentTab === 'pages' && <PagesView />}
         {currentTab === 'media' && <MediaView />}
@@ -60,6 +69,12 @@ export const App: React.FC = () => {
         onClose={() => setIsPublishOpen(false)}
         status={gitStatus}
         onPublished={refreshAllStatus}
+      />
+
+      <HistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        onRollbackComplete={handleRollbackComplete}
       />
     </div>
   );

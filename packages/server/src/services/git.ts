@@ -39,6 +39,21 @@ export interface DeploymentStatusResult {
   totalRuns: number;
 }
 
+export interface GitCommitEntry {
+  hash: string;
+  shortHash: string;
+  message: string;
+  author_name: string;
+  date: string;
+}
+
+export interface RollbackResult {
+  success: boolean;
+  commitHash: string;
+  restoredTo: string;
+  newCommitHash: string;
+}
+
 export async function syncRemote(): Promise<{ success: boolean; message: string }> {
   const remotes = await git.getRemotes(true);
   const originRemote = remotes.find((r) => r.name === 'origin');
@@ -184,4 +199,46 @@ export async function getDeploymentStatus(): Promise<DeploymentStatusResult> {
       totalRuns: 0,
     };
   }
+}
+
+export async function getCommitHistory(maxCount = 20): Promise<GitCommitEntry[]> {
+  try {
+    const logResult = await git.log({ maxCount });
+    return logResult.all.map((c) => ({
+      hash: c.hash,
+      shortHash: c.hash.substring(0, 7),
+      message: c.message,
+      author_name: c.author_name || c.author_email || 'Author',
+      date: c.date,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function rollbackContent(commitHash: string): Promise<RollbackResult> {
+  if (!/^[a-fA-F0-9]{4,40}$/.test(commitHash)) {
+    throw new Error('Invalid commit hash provided for rollback.');
+  }
+
+  const contentRelPath = 'packages/site-template/src/content';
+  await git.checkout([commitHash, '--', contentRelPath]);
+  await git.add(contentRelPath);
+
+  const status = await git.status();
+  const shortHash = commitHash.substring(0, 7);
+
+  let newCommitHash = commitHash;
+  if (status.staged.length > 0) {
+    const commitMsg = `chore(cms): rollback content to ${shortHash}`;
+    const commitResult = await git.commit(commitMsg);
+    newCommitHash = commitResult.commit;
+  }
+
+  return {
+    success: true,
+    commitHash,
+    restoredTo: shortHash,
+    newCommitHash,
+  };
 }

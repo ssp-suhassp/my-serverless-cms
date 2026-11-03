@@ -27,8 +27,10 @@ import {
   Heading2,
   Link as LinkIcon,
   ExternalLink,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { fetchPosts, savePost, deletePost, uploadMedia } from '../api';
+import { htmlToMarkdown, markdownToHtml } from '../utils/markdown';
 import type { PostItem, PostFrontmatter } from '../types';
 
 export const PostsView: React.FC = () => {
@@ -61,7 +63,7 @@ export const PostsView: React.FC = () => {
     ],
     content: '',
     onUpdate: ({ editor }) => {
-      setMarkdownBody(editor.getHTML());
+      setMarkdownBody(htmlToMarkdown(editor.getHTML()));
     },
   });
 
@@ -94,7 +96,7 @@ export const PostsView: React.FC = () => {
     setMarkdownBody(p.body || '');
 
     if (editor) {
-      editor.commands.setContent(p.body || '');
+      editor.commands.setContent(markdownToHtml(p.body || ''));
     }
     setFeedback(null);
   };
@@ -102,6 +104,7 @@ export const PostsView: React.FC = () => {
   const handleCreateNew = () => {
     const today = new Date().toISOString().slice(0, 10);
     const newSlug = `new-article-${Date.now().toString().slice(-4)}`;
+    const initialMd = '# Untitled Article\n\nStart writing your content here...';
     setSelectedSlug(null);
     setTitle('Untitled Article');
     setSlug(newSlug);
@@ -111,12 +114,32 @@ export const PostsView: React.FC = () => {
     setTagsInput('general');
     setCoverImage('');
     setDraft(true);
-    setMarkdownBody('# Untitled Article\n\nStart writing your content here...');
+    setMarkdownBody(initialMd);
 
     if (editor) {
-      editor.commands.setContent('<h1>Untitled Article</h1><p>Start writing your content here...</p>');
+      editor.commands.setContent(markdownToHtml(initialMd));
     }
     setFeedback(null);
+  };
+
+  const handleModeSwitch = (newMode: 'wysiwyg' | 'markdown' | 'preview') => {
+    if (newMode === editorMode) return;
+
+    if (editorMode === 'wysiwyg' && editor) {
+      const convertedMd = htmlToMarkdown(editor.getHTML());
+      setMarkdownBody(convertedMd);
+    } else if (editorMode === 'markdown' && editor && newMode === 'wysiwyg') {
+      editor.commands.setContent(markdownToHtml(markdownBody));
+    }
+
+    setEditorMode(newMode);
+  };
+
+  const handleInsertImage = () => {
+    const url = window.prompt('Enter image URL or path (e.g., /uploads/diagram.webp):');
+    if (url && editor) {
+      editor.chain().focus().setImage({ src: url }).run();
+    }
   };
 
   const handleSave = async () => {
@@ -139,10 +162,15 @@ export const PostsView: React.FC = () => {
       draft,
     };
 
+    const bodyToSave =
+      editorMode === 'wysiwyg' && editor
+        ? htmlToMarkdown(editor.getHTML())
+        : markdownBody;
+
     try {
       await savePost({
         frontmatter,
-        body: markdownBody,
+        body: bodyToSave,
       });
 
       setFeedback({ type: 'success', message: 'Article saved and validated successfully!' });
@@ -282,7 +310,7 @@ export const PostsView: React.FC = () => {
         <div className="h-14 border-b border-slate-800 px-6 flex items-center justify-between bg-slate-900/30 shrink-0">
           <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
             <button
-              onClick={() => setEditorMode('wysiwyg')}
+              onClick={() => handleModeSwitch('wysiwyg')}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all ${
                 editorMode === 'wysiwyg'
                   ? 'bg-indigo-600 text-white shadow-sm'
@@ -293,7 +321,7 @@ export const PostsView: React.FC = () => {
               <span>WYSIWYG</span>
             </button>
             <button
-              onClick={() => setEditorMode('markdown')}
+              onClick={() => handleModeSwitch('markdown')}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all ${
                 editorMode === 'markdown'
                   ? 'bg-indigo-600 text-white shadow-sm'
@@ -304,7 +332,7 @@ export const PostsView: React.FC = () => {
               <span>Raw Markdown</span>
             </button>
             <button
-              onClick={() => setEditorMode('preview')}
+              onClick={() => handleModeSwitch('preview')}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all ${
                 editorMode === 'preview'
                   ? 'bg-indigo-600 text-white shadow-sm'
@@ -528,6 +556,13 @@ export const PostsView: React.FC = () => {
                     className={`p-1.5 rounded ${editor.isActive('blockquote') ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
                   >
                     <Quote className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={handleInsertImage}
+                    className="p-1.5 rounded text-slate-400 hover:text-white"
+                    title="Insert WebP image from /uploads"
+                  >
+                    <ImageIcon className="w-4 h-4" />
                   </button>
                 </div>
                 <div className="p-6 min-h-[350px] text-slate-200">

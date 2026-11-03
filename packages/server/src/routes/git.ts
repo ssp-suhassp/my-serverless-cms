@@ -4,6 +4,8 @@ import {
   publishContent,
   getDeploymentStatus,
   syncRemote,
+  getCommitHistory,
+  rollbackContent,
 } from '../services/git';
 
 export const gitRoutes: FastifyPluginAsync = async (fastify) => {
@@ -63,6 +65,35 @@ export const gitRoutes: FastifyPluginAsync = async (fastify) => {
     } catch (err: any) {
       return reply.status(500).send({
         error: 'Failed to retrieve deployment status',
+        details: err.message,
+      });
+    }
+  });
+
+  fastify.get('/history', async (request, reply) => {
+    try {
+      const commits = await getCommitHistory();
+      return { commits };
+    } catch (err: any) {
+      return reply.status(500).send({
+        error: 'Failed to retrieve Git history',
+        details: err.message,
+      });
+    }
+  });
+
+  fastify.post<{ Body: { commitHash?: string } }>('/rollback', async (request, reply) => {
+    const { commitHash } = request.body || {};
+    if (!commitHash) {
+      return reply.status(400).send({ error: 'Missing commitHash in request body.' });
+    }
+
+    try {
+      const result = await rollbackContent(commitHash);
+      return reply.status(200).send(result);
+    } catch (err: any) {
+      return reply.status(500).send({
+        error: 'Rollback failed',
         details: err.message,
       });
     }

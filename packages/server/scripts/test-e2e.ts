@@ -395,7 +395,29 @@ async function runE2ESuite() {
     }
 
     // ---------------------------------------------------------
-    // 8. Static Site Template & Headless JSON API Verification
+    // 8. Git Commit History Probe (GET /api/git/history)
+    // ---------------------------------------------------------
+    try {
+      const historyRes = await fetch(`${baseUrl}/api/git/history`);
+      const historyData = await historyRes.json();
+      const passed =
+        historyRes.status === 200 &&
+        Array.isArray(historyData.commits) &&
+        historyData.commits.length > 0 &&
+        typeof historyData.commits[0].hash === 'string' &&
+        typeof historyData.commits[0].shortHash === 'string';
+
+      record(
+        '8. Git commit timeline history probe',
+        passed,
+        `Retrieved ${historyData.commits?.length || 0} commits, latest: [${historyData.commits?.[0]?.shortHash || 'n/a'}]`
+      );
+    } catch (err: any) {
+      record('8. Git commit timeline history probe', false, err.message);
+    }
+
+    // ---------------------------------------------------------
+    // 9. Static Site Template & Headless JSON API Verification
     // ---------------------------------------------------------
     try {
       const distDir = path.resolve(__dirname, '../../site-template/dist');
@@ -440,16 +462,16 @@ async function runE2ESuite() {
         Array.isArray(parsedTagsData.tags);
 
       record(
-        '8. Astro Headless JSON API & static site build verification',
+        '9. Astro Headless JSON API & static site build verification',
         passed,
         `API outputs: posts.json (${parsedPostsData.posts?.length || 0} posts), home.json (${parsedHome.blocks?.length || 0} blocks), tags.json (${parsedTagsData.tags?.length || 0} tags)`
       );
     } catch (err: any) {
-      record('8. Astro Headless JSON API & static site build verification', false, err.message);
+      record('9. Astro Headless JSON API & static site build verification', false, err.message);
     }
 
     // ---------------------------------------------------------
-    // 9. React Studio Production Build Verification
+    // 10. React Studio Production Build Verification
     // ---------------------------------------------------------
     try {
       const studioDistHtml = path.resolve(__dirname, '../../studio/dist/index.html');
@@ -464,12 +486,12 @@ async function runE2ESuite() {
       const passed = fs.existsSync(studioDistHtml) && studioHtmlContent.includes('<div id="root">');
 
       record(
-        '9. React CMS Studio production build bundle verification',
+        '10. React CMS Studio production build bundle verification',
         passed,
         `Studio dist/index.html verified (${studioHtmlContent.length} bytes)`
       );
     } catch (err: any) {
-      record('9. React CMS Studio production build bundle verification', false, err.message);
+      record('10. React CMS Studio production build bundle verification', false, err.message);
     }
   } finally {
     await server.close();

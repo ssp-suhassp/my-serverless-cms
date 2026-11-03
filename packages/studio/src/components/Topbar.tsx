@@ -10,6 +10,7 @@ import {
   Clock,
   AlertCircle,
   ExternalLink,
+  History,
 } from 'lucide-react';
 import type { StudioTab, GitStatus, DeploymentStatus, UserConfig } from '../types';
 
@@ -20,6 +21,7 @@ interface TopbarProps {
   deploymentStatus: DeploymentStatus | null;
   userConfig: UserConfig | null;
   onOpenPublish: () => void;
+  onOpenHistory: () => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -29,6 +31,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   deploymentStatus,
   userConfig,
   onOpenPublish,
+  onOpenHistory,
 }) => {
   const uncommittedCount =
     (gitStatus?.modified.length || 0) +
@@ -160,6 +163,16 @@ export const Topbar: React.FC<TopbarProps> = ({
             <span className="text-emerald-400">Clean</span>
           )}
         </div>
+
+        {/* History Action Button */}
+        <button
+          onClick={onOpenHistory}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700/60 shadow-sm transition-all"
+          title="View Git commit timeline and rollback content"
+        >
+          <History className="w-3.5 h-3.5 text-indigo-400" />
+          <span className="hidden sm:inline">History</span>
+        </button>
 
         {/* Publish Action Button */}
         <button
