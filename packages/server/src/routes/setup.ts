@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { loadConfig, saveConfig, type CMSConfig } from '../config';
 import { provisionRepository, verifyGitHubToken } from '../services/github';
+import { pushInitialScaffold } from '../services/git';
 
 export const setupRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/status', async () => {
@@ -78,6 +79,9 @@ export const setupRoutes: FastifyPluginAsync = async (fastify) => {
         isPrivate,
         description,
       });
+
+      // Configure authenticated origin and push initial monorepo scaffold to GitHub
+      await pushInitialScaffold(result.owner, repoName, config.githubToken);
 
       return {
         success: true,

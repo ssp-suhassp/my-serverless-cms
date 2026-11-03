@@ -1,11 +1,39 @@
 import { buildServer } from '../src/index';
-import { extractCredentialsFromEnvTest, PATHS } from '../src/config';
+import { PATHS } from '../src/config';
 import sharp from 'sharp';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+
+function extractCredentialsFromEnvTest(): { token?: string; owner?: string } {
+  const envTestPath = path.join(PATHS.root, 'References', '.env-test');
+  if (!fs.existsSync(envTestPath)) {
+    return {};
+  }
+  try {
+    const content = fs.readFileSync(envTestPath, 'utf-8');
+    const lines = content.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    let token: string | undefined;
+    let owner: string | undefined;
+    for (const line of lines) {
+      if (/^(gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+)/.test(line)) {
+        token = line;
+      } else if (line.includes('github.com/')) {
+        const match = line.match(/github\.com\/([a-zA-Z0-9_-]+)/);
+        if (match) owner = match[1];
+      } else if (line.startsWith('GITHUB_TOKEN=') || line.startsWith('GITHUB_PAT=')) {
+        token = line.split('=')[1]?.trim();
+      } else if (line.startsWith('REPO_OWNER=')) {
+        owner = line.split('=')[1]?.trim();
+      }
+    }
+    return { token, owner };
+  } catch {
+    return {};
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -531,7 +559,12 @@ async function runE2ESuite() {
     }
   } finally {
     await server.close();
-    console.log('\n[Test Daemon] Shut down cleanly.');
+    if (fs.existsSync(PATHS.config)) {
+      try {
+        fs.unlinkSync(PATHS.config);
+      } catch {}
+    }
+    console.log('\n[Test Daemon] Shut down cleanly. Cleaned up .cms-config.json.');
   }
 
   console.log('\n' + '='.repeat(75));

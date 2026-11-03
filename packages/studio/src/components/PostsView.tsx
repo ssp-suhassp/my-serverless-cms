@@ -259,7 +259,7 @@ export const PostsView: React.FC<PostsViewProps> = ({ onPublishTrigger }) => {
   });
 
   // =========================================================================
-  // VIEW 1: Post Index List (Ghost Style Table)
+  // VIEW 1: Post Index List (Editorial Table)
   // =========================================================================
   if (!selectedPost) {
     return (
@@ -535,7 +535,7 @@ export const PostsView: React.FC<PostsViewProps> = ({ onPublishTrigger }) => {
         <div className="flex-1 flex flex-col overflow-y-auto">
           {authoringMode === 'editor' ? (
             /* ======================================================== */
-            /* Ghost Style Editor Canvas                               */
+            /* Minimal Editorial Canvas                                 */
             /* ======================================================== */
             <div className="max-w-3xl w-full mx-auto px-6 py-12 space-y-6">
               {/* Document Title */}

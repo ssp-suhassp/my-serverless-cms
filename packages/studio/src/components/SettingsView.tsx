@@ -13,15 +13,17 @@ import {
   Sparkles,
   ArrowRight,
   User,
+  LogOut,
 } from 'lucide-react';
-import { fetchConfig, saveConfig, fetchAuthUser, verifyToken } from '../api';
+import { fetchConfig, saveConfig, fetchAuthUser, verifyToken, logout } from '../api';
 import type { UserConfig } from '../types';
 
 interface SettingsViewProps {
   onReRunSetup?: () => void;
+  onLogout?: () => void;
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onReRunSetup }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ onReRunSetup, onLogout }) => {
   const [config, setConfig] = useState<UserConfig | null>(null);
   const [authUser, setAuthUser] = useState<any | null>(null);
   const [siteTitle, setSiteTitle] = useState('');
@@ -154,6 +156,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onReRunSetup }) => {
               </span>
             </div>
           </div>
+
+          {onLogout && (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={onLogout}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-red-950/20 hover:bg-red-950/40 border border-red-900/40 text-red-400 text-xs font-medium transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out from GitHub</span>
+              </button>
+            </div>
+          )}
         </section>
 
         {/* Section 2: Publication Configuration */}

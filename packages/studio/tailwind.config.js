@@ -5,7 +5,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        ghost: {
+        editorial: {
           canvas: '#0d0f12',
           surface: '#14171c',
           card: '#161a20',

@@ -123,7 +123,16 @@ export async function provisionRepository(
     : `https://${owner}.github.io/${repoName}/`;
 
   try {
-    await octokit.rest.repos.getPages({ owner, repo: repoName });
+    const existingPages = await octokit.rest.repos.getPages({ owner, repo: repoName });
+    if (existingPages.data.build_type !== 'workflow') {
+      try {
+        await octokit.rest.repos.updateInformationAboutPagesSite({
+          owner,
+          repo: repoName,
+          build_type: 'workflow',
+        });
+      } catch { }
+    }
   } catch (err: any) {
     if (err.status === 404) {
       try {
@@ -132,7 +141,7 @@ export async function provisionRepository(
           repo: repoName,
           build_type: 'workflow',
         });
-      } catch {}
+      } catch { }
     }
   }
 

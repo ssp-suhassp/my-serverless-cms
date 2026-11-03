@@ -167,10 +167,45 @@ export async function getGitStatus(): Promise<GitEngineStatus> {
   };
 }
 
+export async function configureRemoteOrigin(owner: string, repo: string, token: string): Promise<string> {
+  const authenticatedUrl = `https://x-access-token:${token}@github.com/${owner}/${repo}.git`;
+  const remotes = await git.getRemotes(true);
+  const origin = remotes.find((r) => r.name === 'origin');
+  if (origin) {
+    await git.remote(['set-url', 'origin', authenticatedUrl]);
+  } else {
+    await git.addRemote('origin', authenticatedUrl);
+  }
+  return authenticatedUrl;
+}
+
+export async function pushInitialScaffold(owner: string, repo: string, token: string): Promise<boolean> {
+  try {
+    const authenticatedUrl = await configureRemoteOrigin(owner, repo, token);
+    await git.add('.');
+    const status = await git.status();
+    if (status.staged.length > 0) {
+      await git.commit('feat(cms): scaffold monorepo and initial site content');
+    }
+    await git.push(['-u', authenticatedUrl, 'main']);
+    return true;
+  } catch (err) {
+    console.error('Initial scaffold push error:', err);
+    return false;
+  }
+}
+
 export async function publishContent(message?: string): Promise<PublishResult> {
+  const config = loadConfig();
+
+  if (config.githubToken && config.repoOwner && config.repoName) {
+    try {
+      await configureRemoteOrigin(config.repoOwner, config.repoName, config.githubToken);
+    } catch {}
+  }
+
   const remotes = await git.getRemotes(true);
   const originRemote = remotes.find((r) => r.name === 'origin');
-  const config = loadConfig();
 
   if (originRemote) {
     try {
@@ -188,10 +223,8 @@ export async function publishContent(message?: string): Promise<PublishResult> {
     }
   }
 
-  await git.add([
-    'packages/site-template/src/content/',
-    'packages/site-template/public/uploads/',
-  ]);
+  // Ensure entire monorepo content and any updated templates are staged
+  await git.add('.');
 
   const currentStatus = await git.status();
   let commitMessage = message?.trim();
@@ -210,7 +243,7 @@ export async function publishContent(message?: string): Promise<PublishResult> {
 
   let pushed = false;
 
-  if (originRemote && config.githubToken && config.repoOwner && config.repoName) {
+  if (config.githubToken && config.repoOwner && config.repoName) {
     const authenticatedUrl = `https://x-access-token:${config.githubToken}@github.com/${config.repoOwner}/${config.repoName}.git`;
     try {
       await git.push(authenticatedUrl, 'main');

@@ -26,6 +26,14 @@ export async function fetchAuthUser(): Promise<any> {
   return res.json();
 }
 
+export async function logout(): Promise<{ success: boolean; message?: string }> {
+  const res = await fetch(`${API_BASE}/auth/logout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  return res.json();
+}
+
 export async function verifyToken(token: string): Promise<any> {
   const res = await fetch(`${API_BASE}/auth/verify`, {
     method: 'POST',

@@ -9,6 +9,7 @@ import {
   GitBranch,
   Circle,
   UploadCloud,
+  LogOut,
 } from 'lucide-react';
 import type { StudioTab, GitStatus, UserConfig } from '../types';
 
@@ -19,6 +20,7 @@ interface SidebarProps {
   gitStatus: GitStatus | null;
   onOpenHistory: () => void;
   onOpenPublish: () => void;
+  onLogout?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -28,6 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   gitStatus,
   onOpenHistory,
   onOpenPublish,
+  onLogout,
 }) => {
   const uncommittedCount =
     (gitStatus?.modified.length || 0) +
@@ -117,6 +120,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             Rollback
           </span>
         </button>
+
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center gap-2.5 px-3 py-2 mt-2 rounded-lg text-xs font-medium text-zinc-400 hover:text-red-400 hover:bg-red-950/20 transition-all"
+            title="Sign out and return to GitHub login screen"
+          >
+            <LogOut className="w-4 h-4 text-zinc-500" />
+            <span>Sign Out</span>
+          </button>
+        )}
       </nav>
 
       {/* Git Publish Bar */}

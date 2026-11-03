@@ -4,7 +4,7 @@ import {
   pollDeviceToken,
   verifyGitHubToken,
 } from '../services/github';
-import { loadConfig, saveConfig } from '../config';
+import { loadConfig, saveConfig, clearConfig } from '../config';
 
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post<{ Body: { clientId: string } }>('/device-code', async (request, reply) => {
@@ -67,6 +67,11 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     } catch (err: any) {
       return reply.status(401).send({ authenticated: false, error: err.message });
     }
+  });
+
+  fastify.post('/logout', async () => {
+    clearConfig();
+    return { success: true, message: 'Logged out successfully' };
   });
 };
 

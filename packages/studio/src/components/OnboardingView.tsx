@@ -11,6 +11,8 @@ import {
   Loader2,
   Globe,
   GitBranch,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   requestDeviceCode,
@@ -42,8 +44,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
     interval: number;
   } | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [pollingStatus, setPollingStatus] = useState<string>('idle');
-  const [usePatMode, setUsePatMode] = useState(false);
+  const [pollingStatus, setPollingStatus] = useState<'idle' | 'requesting' | 'waiting_user' | 'authenticated'>('idle');
+  const [showPatInput, setShowPatInput] = useState(false);
   const [patInput, setPatInput] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [authenticating, setAuthenticating] = useState(false);
@@ -69,30 +71,26 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
   );
 
   // -------------------------------------------------------------
-  // Step 1: Initialize Device Flow or Auto-detect PAT
+  // Step 1: Device Flow
   // -------------------------------------------------------------
-  const initDeviceFlow = async () => {
+  const handleStartDeviceFlow = async () => {
     setAuthError(null);
     setPollingStatus('requesting');
     try {
-      const clientId = 'Ov23liM3hW7i6f4v9S8g'; // GitHub OAuth App Client ID
+      const clientId = 'Ov23liM3hW7i6f4v9S8g';
       const data = await requestDeviceCode(clientId);
       if (data.user_code) {
         setDeviceData(data);
         setPollingStatus('waiting_user');
       } else {
         setAuthError('Failed to obtain device code from GitHub.');
+        setPollingStatus('idle');
       }
     } catch (err: any) {
       setAuthError(err.message || 'Network error requesting device code');
+      setPollingStatus('idle');
     }
   };
-
-  useEffect(() => {
-    if (step === 1 && !usePatMode && !deviceData) {
-      initDeviceFlow();
-    }
-  }, [step, usePatMode]);
 
   // Polling loop for Device Flow
   useEffect(() => {
@@ -105,7 +103,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
           const tokenRes = await pollDeviceCode(clientId, deviceData.device_code);
           if (tokenRes.access_token) {
             setPollingStatus('authenticated');
-            // Verify and save token
             const verifyRes = await verifyToken(tokenRes.access_token);
             if (verifyRes.success) {
               setUser(verifyRes.user);
@@ -177,7 +174,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
           setProvisionError(res.error || res.details || 'Failed to provision repository.');
         }
       } else {
-        // Connect existing
         const generatedPagesUrl = `https://${user?.login}.github.io/${repoName.trim()}/`;
         setPagesUrl(generatedPagesUrl);
         await saveConfig({
@@ -197,11 +193,9 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0d0f12] text-zinc-100 flex flex-col items-center justify-center p-6 overflow-y-auto">
-      {/* Background Accent */}
+    <div className="fixed inset-0 z-50 bg-[#0d0f12] text-zinc-100 flex flex-col items-center justify-center p-6 overflow-y-auto font-sans">
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-zinc-800/20 blur-3xl pointer-events-none rounded-full" />
 
-      {/* Main Container */}
       <div className="w-full max-w-xl relative">
         {/* Brand Header */}
         <div className="text-center mb-8">
@@ -243,7 +237,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
           {step === 1 && (
             <div className="space-y-6">
               <div className="border-b border-zinc-800 pb-4">
-                <h2 className="text-base font-medium text-zinc-100">Step 1: Connect to GitHub</h2>
+                <h2 className="text-base font-medium text-zinc-100">Step 1: Sign in with GitHub</h2>
                 <p className="text-xs text-zinc-400 mt-0.5">
                   Authorize your local studio to push articles, transcode assets, and deploy to Pages.
                 </p>
@@ -256,16 +250,39 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                 </div>
               )}
 
-              {!usePatMode ? (
-                /* OAuth Device Flow */
-                <div className="space-y-5">
+              {/* Primary: Continue with GitHub (Device Flow) */}
+              {!deviceData ? (
+                <div className="space-y-3">
+                  <button
+                    onClick={handleStartDeviceFlow}
+                    disabled={pollingStatus === 'requesting'}
+                    className="w-full inline-flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-semibold text-sm transition-all shadow-sm"
+                  >
+                    {pollingStatus === 'requesting' ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Contacting GitHub...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Continue with GitHub</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                  <p className="text-[11px] text-center text-zinc-500">
+                    Uses secure RFC 8628 Device Authorization Flow without exposing credentials.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
                   <div className="bg-[#101317] border border-zinc-800 rounded-xl p-5 text-center space-y-3">
-                    <span className="text-xs uppercase font-mono tracking-widest text-zinc-500">
-                      GitHub Device Verification Code
+                    <span className="text-xs uppercase font-mono tracking-widest text-zinc-400 font-medium">
+                      Your One-Time Code
                     </span>
                     <div className="flex items-center justify-center gap-3">
                       <span className="font-mono text-3xl font-bold tracking-wider text-zinc-100 select-all">
-                        {deviceData?.user_code || '····-····'}
+                        {deviceData.user_code}
                       </span>
                       <button
                         onClick={handleCopyUserCode}
@@ -280,12 +297,12 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                       </button>
                     </div>
                     <p className="text-xs text-zinc-400">
-                      Enter this one-time code on GitHub to authenticate your local session.
+                      Copy the code above and enter it on the GitHub verification page.
                     </p>
                   </div>
 
                   <a
-                    href={deviceData?.verification_uri || 'https://github.com/login/device'}
+                    href={deviceData.verification_uri || 'https://github.com/login/device'}
                     target="_blank"
                     rel="noreferrer"
                     className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-medium text-sm transition-all shadow-sm"
@@ -294,46 +311,46 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                     <ExternalLink className="w-4 h-4" />
                   </a>
 
-                  <div className="flex items-center justify-center gap-2 text-xs text-zinc-500 pt-1">
+                  <div className="flex items-center justify-center gap-2 text-xs text-zinc-400 pt-1">
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
                     <span>Waiting for GitHub confirmation...</span>
                   </div>
-
-                  <div className="border-t border-zinc-800/80 pt-4 text-center">
-                    <button
-                      type="button"
-                      onClick={() => setUsePatMode(true)}
-                      className="text-xs text-zinc-400 hover:text-zinc-200 underline underline-offset-4"
-                    >
-                      Advanced: Connect via Personal Access Token (PAT)
-                    </button>
-                  </div>
                 </div>
-              ) : (
-                /* PAT Fallback Mode */
-                <form onSubmit={handlePatSubmit} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-                      <Key className="w-3.5 h-3.5 text-zinc-400" />
-                      GitHub Personal Access Token (PAT)
-                    </label>
-                    <input
-                      type="password"
-                      placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                      value={patInput}
-                      onChange={(e) => setPatInput(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#101317] border border-zinc-800 text-zinc-100 font-mono text-xs focus:outline-none focus:border-zinc-500"
-                    />
-                    <p className="text-[11px] text-zinc-500">
-                      Token requires <code className="text-zinc-300">repo</code> and <code className="text-zinc-300">workflow</code> scopes.
-                    </p>
-                  </div>
+              )}
 
-                  <div className="flex items-center gap-3 pt-2">
+              {/* Collapsible: PAT Fallback */}
+              <div className="border-t border-zinc-800/80 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowPatInput((prev) => !prev)}
+                  className="w-full flex items-center justify-between text-xs text-zinc-400 hover:text-zinc-200 transition-colors py-1"
+                >
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <Key className="w-3.5 h-3.5 text-zinc-400" />
+                    Or connect via Personal Access Token (PAT)
+                  </span>
+                  {showPatInput ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+
+                {showPatInput && (
+                  <form onSubmit={handlePatSubmit} className="space-y-3 mt-3 pt-3 border-t border-zinc-800/60">
+                    <div className="space-y-1.5">
+                      <input
+                        type="password"
+                        placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                        value={patInput}
+                        onChange={(e) => setPatInput(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#101317] border border-zinc-800 text-zinc-100 font-mono text-xs focus:outline-none focus:border-zinc-500"
+                      />
+                      <p className="text-[11px] text-zinc-400">
+                        Token requires <code className="text-zinc-200">repo</code> and <code className="text-zinc-200">workflow</code> permissions.
+                      </p>
+                    </div>
+
                     <button
                       type="submit"
                       disabled={authenticating || !patInput.trim()}
-                      className="flex-1 py-2.5 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-medium text-xs transition-colors flex items-center justify-center gap-2"
+                      className="w-full py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium text-xs transition-colors flex items-center justify-center gap-2"
                     >
                       {authenticating ? (
                         <>
@@ -341,19 +358,12 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                           <span>Verifying Token...</span>
                         </>
                       ) : (
-                        <span>Verify &amp; Continue</span>
+                        <span>Verify &amp; Connect</span>
                       )}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setUsePatMode(false)}
-                      className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors"
-                    >
-                      Back to Device Flow
-                    </button>
-                  </div>
-                </form>
-              )}
+                  </form>
+                )}
+              </div>
             </div>
           )}
 
@@ -371,12 +381,10 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                 </div>
                 {user && (
                   <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-xs">
-                    <img
-                      src={user.avatar_url}
-                      alt={user.login}
-                      className="w-4 h-4 rounded-full"
-                    />
-                    <span className="font-mono text-zinc-300">@{user.login}</span>
+                    {user.avatar_url && (
+                      <img src={user.avatar_url} alt="" className="w-4 h-4 rounded-full" />
+                    )}
+                    <span className="text-zinc-200 font-mono text-[11px]">@{user.login}</span>
                   </div>
                 )}
               </div>
@@ -428,7 +436,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                     }`}
                   >
                     <span className="font-semibold block mb-0.5">Create New Repo</span>
-                    <span className="text-[11px] text-zinc-500">
+                    <span className="text-[11px] text-zinc-400">
                       Creates repository and enables Pages workflow.
                     </span>
                   </label>
@@ -442,8 +450,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                     }`}
                   >
                     <span className="font-semibold block mb-0.5">Connect Existing</span>
-                    <span className="text-[11px] text-zinc-500">
-                      Links local workspace to an already-created repo.
+                    <span className="text-[11px] text-zinc-400">
+                      Links local workspace to an existing repository.
                     </span>
                   </label>
                 </div>
@@ -530,7 +538,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                 onClick={onCompleted}
                 className="w-full py-3 px-4 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-medium text-xs transition-all shadow-sm flex items-center justify-center gap-2"
               >
-                <span>Launch Ghost Studio</span>
+                <span>Launch Studio</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>

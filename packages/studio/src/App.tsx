@@ -7,7 +7,7 @@ import { PostsView } from './components/PostsView';
 import { PagesView } from './components/PagesView';
 import { MediaView } from './components/MediaView';
 import { SettingsView } from './components/SettingsView';
-import { fetchGitStatus, fetchDeploymentStatus, fetchConfig, fetchSetupStatus } from './api';
+import { fetchGitStatus, fetchDeploymentStatus, fetchConfig, fetchSetupStatus, logout } from './api';
 import type { StudioTab, GitStatus, DeploymentStatus, UserConfig, SetupStatus } from './types';
 import { Loader2 } from 'lucide-react';
 
@@ -62,6 +62,17 @@ export const App: React.FC = () => {
     setContentKey((prev) => prev + 1);
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setSetupStatus(null);
+      setUserConfig(null);
+      setShowOnboarding(true);
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
+
   useEffect(() => {
     checkSetupAndStatus();
     refreshAllStatus();
@@ -94,7 +105,7 @@ export const App: React.FC = () => {
 
   return (
     <div className="h-screen w-screen flex bg-[#0d0f12] text-zinc-100 overflow-hidden font-sans">
-      {/* Ghost-Style Navigation Sidebar */}
+      {/* Studio Navigation Sidebar */}
       <Sidebar
         currentTab={currentTab}
         onTabChange={setCurrentTab}
@@ -102,6 +113,7 @@ export const App: React.FC = () => {
         gitStatus={gitStatus}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onOpenPublish={() => setIsPublishOpen(true)}
+        onLogout={handleLogout}
       />
 
       {/* Main Workspace View */}
@@ -110,7 +122,10 @@ export const App: React.FC = () => {
         {currentTab === 'pages' && <PagesView />}
         {currentTab === 'media' && <MediaView />}
         {currentTab === 'settings' && (
-          <SettingsView onReRunSetup={() => setShowOnboarding(true)} />
+          <SettingsView
+            onReRunSetup={() => setShowOnboarding(true)}
+            onLogout={handleLogout}
+          />
         )}
       </main>
 
