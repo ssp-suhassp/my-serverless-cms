@@ -1,0 +1,24 @@
+{
+  "name": "serverless-cms-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/studio",
+    "packages/site-template"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -p \"[{name}]\" -n \"server,studio,site\" -c \"blue,magenta,green\" \"npm run dev -w @cms/server\" \"npm run dev -w @cms/studio\" \"npm run dev -w @cms/site-template\"",
+    "build": "npm run build -w @cms/shared && npm run build -w @cms/server && npm run build -w @cms/studio && npm run build -w @cms/site-template",
+    "typecheck": "npm run typecheck -w @cms/shared && npm run typecheck -w @cms/server && npm run typecheck -w @cms/studio && npm run typecheck -w @cms/site-template"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.6.3"
+  }
+}
+
