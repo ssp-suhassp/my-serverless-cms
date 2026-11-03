@@ -147,31 +147,41 @@ export async function publishContent(message?: string): Promise<PublishResult> {
 export async function getDeploymentStatus(): Promise<DeploymentStatusResult> {
   const config = loadConfig();
   if (!config.githubToken || !config.repoOwner || !config.repoName) {
-    throw new Error('Missing GitHub credentials or repository configuration in .cms-config.json');
+    return {
+      latestRun: null,
+      totalRuns: 0,
+    };
   }
 
-  const octokit = new Octokit({ auth: config.githubToken });
+  try {
+    const octokit = new Octokit({ auth: config.githubToken });
 
-  const { data } = await octokit.rest.actions.listWorkflowRunsForRepo({
-    owner: config.repoOwner,
-    repo: config.repoName,
-    per_page: 5,
-  });
+    const { data } = await octokit.rest.actions.listWorkflowRunsForRepo({
+      owner: config.repoOwner,
+      repo: config.repoName,
+      per_page: 5,
+    });
 
-  const latest = data.workflow_runs[0];
+    const latest = data.workflow_runs[0];
 
-  return {
-    latestRun: latest
-      ? {
-          id: latest.id,
-          name: latest.name ?? null,
-          status: latest.status ?? null,
-          conclusion: latest.conclusion ?? null,
-          html_url: latest.html_url,
-          createdAt: latest.created_at,
-          updatedAt: latest.updated_at,
-        }
-      : null,
-    totalRuns: data.total_count,
-  };
+    return {
+      latestRun: latest
+        ? {
+            id: latest.id,
+            name: latest.name ?? null,
+            status: latest.status ?? null,
+            conclusion: latest.conclusion ?? null,
+            html_url: latest.html_url,
+            createdAt: latest.created_at,
+            updatedAt: latest.updated_at,
+          }
+        : null,
+      totalRuns: data.total_count,
+    };
+  } catch {
+    return {
+      latestRun: null,
+      totalRuns: 0,
+    };
+  }
 }

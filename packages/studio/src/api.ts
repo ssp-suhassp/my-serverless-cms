@@ -198,3 +198,4 @@ export async function fetchDeploymentStatus(): Promise<DeploymentStatus> {
   const res = await fetch(`${API_BASE}/git/deployment-status`);
   return res.json();
 }
+

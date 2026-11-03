@@ -14,7 +14,8 @@
   "scripts": {
     "dev": "concurrently -k -p \"[{name}]\" -n \"server,studio,site\" -c \"blue,magenta,green\" \"npm run dev -w @cms/server\" \"npm run dev -w @cms/studio\" \"npm run dev -w @cms/site-template\"",
     "build": "npm run build -w @cms/shared && npm run build -w @cms/server && npm run build -w @cms/studio && npm run build -w @cms/site-template",
-    "typecheck": "npm run typecheck -w @cms/shared && npm run typecheck -w @cms/server && npm run typecheck -w @cms/studio && npm run typecheck -w @cms/site-template"
+    "typecheck": "npm run typecheck -w @cms/shared && npm run typecheck -w @cms/server && npm run typecheck -w @cms/studio && npm run typecheck -w @cms/site-template",
+    "test": "npm run test:e2e -w @cms/server"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

@@ -73,3 +73,4 @@ export interface UserConfig {
   lastSyncedCommit?: string;
   hasToken?: boolean;
 }
+

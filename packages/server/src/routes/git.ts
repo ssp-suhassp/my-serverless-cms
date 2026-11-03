@@ -55,5 +55,17 @@ export const gitRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
   });
+
+  fastify.get('/deploy-status', async (request, reply) => {
+    try {
+      const status = await getDeploymentStatus();
+      return status;
+    } catch (err: any) {
+      return reply.status(500).send({
+        error: 'Failed to retrieve deployment status',
+        details: err.message,
+      });
+    }
+  });
 };
 

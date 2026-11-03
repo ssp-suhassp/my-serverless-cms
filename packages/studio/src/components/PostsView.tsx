@@ -566,3 +566,4 @@ export const PostsView: React.FC = () => {
     </div>
   );
 };
+

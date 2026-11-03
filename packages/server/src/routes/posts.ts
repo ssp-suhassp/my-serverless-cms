@@ -52,6 +52,33 @@ export const postRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
+  fastify.put<{
+    Params: { slug: string };
+    Body: {
+      frontmatter: unknown;
+      body?: string;
+    };
+  }>('/:slug', async (request, reply) => {
+    try {
+      const result = savePost(request.body || { frontmatter: {} });
+      return reply.status(200).send({
+        success: true,
+        post: result,
+      });
+    } catch (err: any) {
+      if (err instanceof ZodError) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          issues: err.errors.map((e) => ({
+            field: e.path.join('.'),
+            message: e.message,
+          })),
+        });
+      }
+      return reply.status(500).send({ error: err.message });
+    }
+  });
+
   fastify.delete<{ Params: { slug: string } }>('/:slug', async (request, reply) => {
     const { slug } = request.params;
     try {
