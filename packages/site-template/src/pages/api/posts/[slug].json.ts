@@ -1,7 +1,7 @@
 import type { APIRoute, GetStaticPaths } from 'astro';
 import { getCollection, type CollectionEntry } from 'astro:content';
 import { marked } from 'marked';
-import { withBase } from '../../../utils/basePath';
+import { withBase, rewriteHtmlSubpaths } from '../../../utils/basePath';
 
 export const prerender = true;
 
@@ -22,7 +22,8 @@ interface Props {
 
 export const GET: APIRoute = async ({ props }) => {
   const { post } = props as Props;
-  const renderedHtml = await marked.parse(post.body || '');
+  const rawHtml = await marked.parse(post.body || '');
+  const renderedHtml = rewriteHtmlSubpaths(rawHtml);
 
   const payload = {
     frontmatter: {

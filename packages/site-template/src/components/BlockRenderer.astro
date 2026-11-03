@@ -1,7 +1,7 @@
 ---
 import type { PageBlock } from '@cms/shared';
 import { marked } from 'marked';
-import { withBase } from '../utils/basePath';
+import { withBase, rewriteHtmlSubpaths } from '../utils/basePath';
 
 interface Props {
   blocks: PageBlock[];
@@ -12,7 +12,8 @@ const { blocks } = Astro.props;
 const renderedBlocks = await Promise.all(
   blocks.map(async (block) => {
     if (block.type === 'richtext') {
-      const html = await marked.parse(block.markdown);
+      const rawHtml = await marked.parse(block.markdown);
+      const html = rewriteHtmlSubpaths(rawHtml);
       return { ...block, html };
     }
     return block;

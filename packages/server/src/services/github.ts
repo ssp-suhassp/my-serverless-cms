@@ -29,7 +29,24 @@ export interface ProvisionResult {
   repo: string;
   remoteUrl: string;
   pagesUrl: string;
+  basePath: string;
   isNewRepo: boolean;
+}
+
+export function resolvePagesUrlAndBasePath(repoOwner: string, repoName: string): {
+  isUserSite: boolean;
+  basePath: string;
+  pagesUrl: string;
+} {
+  const cleanOwner = repoOwner.trim().toLowerCase();
+  const cleanRepo = repoName.trim();
+  const isUserSite = cleanRepo.toLowerCase() === `${cleanOwner}.github.io`;
+  const basePath = isUserSite ? '/' : `/${cleanRepo}`;
+  const pagesUrl = isUserSite
+    ? `https://${cleanOwner}.github.io/`
+    : `https://${cleanOwner}.github.io/${cleanRepo}/`;
+
+  return { isUserSite, basePath, pagesUrl };
 }
 
 export async function initiateDeviceFlow(clientId: string): Promise<DeviceCodeResponse> {
@@ -117,13 +134,19 @@ export async function provisionRepository(
     }
   }
 
-  const isUserPages = repoName.toLowerCase() === `${owner.toLowerCase()}.github.io`;
-  const pagesUrl = isUserPages
-    ? `https://${owner}.github.io/`
-    : `https://${owner}.github.io/${repoName}/`;
+  const { isUserSite, basePath } = resolvePagesUrlAndBasePath(owner, repoName);
+  let pagesUrl = isUserSite
+    ? `https://${owner.toLowerCase()}.github.io/`
+    : `https://${owner.toLowerCase()}.github.io/${repoName}/`;
 
+  // Idempotent GitHub Pages configuration with build_type = 'workflow'
   try {
     const existingPages = await octokit.rest.repos.getPages({ owner, repo: repoName });
+    if (existingPages.data.html_url) {
+      pagesUrl = existingPages.data.html_url.endsWith('/')
+        ? existingPages.data.html_url
+        : `${existingPages.data.html_url}/`;
+    }
     if (existingPages.data.build_type !== 'workflow') {
       try {
         await octokit.rest.repos.updateInformationAboutPagesSite({
@@ -131,17 +154,32 @@ export async function provisionRepository(
           repo: repoName,
           build_type: 'workflow',
         });
-      } catch { }
+      } catch {}
     }
   } catch (err: any) {
     if (err.status === 404) {
       try {
-        await octokit.rest.repos.createPagesSite({
+        const createdPages = await octokit.rest.repos.createPagesSite({
           owner,
           repo: repoName,
           build_type: 'workflow',
         });
-      } catch { }
+        if (createdPages.data.html_url) {
+          pagesUrl = createdPages.data.html_url.endsWith('/')
+            ? createdPages.data.html_url
+            : `${createdPages.data.html_url}/`;
+        }
+      } catch (createErr: any) {
+        if (createErr.status === 409) {
+          try {
+            await octokit.rest.repos.updateInformationAboutPagesSite({
+              owner,
+              repo: repoName,
+              build_type: 'workflow',
+            });
+          } catch {}
+        }
+      }
     }
   }
 
@@ -150,7 +188,7 @@ export async function provisionRepository(
     repoOwner: owner,
     repoName,
     pagesUrl,
-    basePath: isUserPages ? '/' : `/${repoName}/`,
+    basePath,
   });
 
   const remoteUrl = `https://github.com/${owner}/${repoName}.git`;
@@ -160,7 +198,45 @@ export async function provisionRepository(
     repo: repoName,
     remoteUrl,
     pagesUrl,
+    basePath,
     isNewRepo,
   };
 }
 
+export async function triggerWorkflowDispatchIfNeeded(
+  token: string,
+  owner: string,
+  repo: string,
+  workflowId: string = 'deploy.yml',
+  ref: string = 'main'
+): Promise<boolean> {
+  const octokit = new Octokit({ auth: token });
+  try {
+    // Brief delay to allow GitHub event webhook registration
+    await new Promise((r) => setTimeout(r, 2000));
+
+    const runs = await octokit.rest.actions.listWorkflowRunsForRepo({
+      owner,
+      repo,
+      per_page: 5,
+    });
+
+    const hasActiveRun = runs.data.workflow_runs.some(
+      (r) => r.status === 'queued' || r.status === 'in_progress'
+    );
+
+    if (!hasActiveRun) {
+      await octokit.rest.actions.createWorkflowDispatch({
+        owner,
+        repo,
+        workflow_id: workflowId,
+        ref,
+      });
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.warn('[Workflow Trigger] Notice:', err);
+    return false;
+  }
+}

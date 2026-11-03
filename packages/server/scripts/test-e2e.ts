@@ -1,5 +1,6 @@
 import { buildServer } from '../src/index';
 import { PATHS } from '../src/config';
+import { resolvePagesUrlAndBasePath } from '../src/services/github';
 import sharp from 'sharp';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -556,6 +557,38 @@ async function runE2ESuite() {
       );
     } catch (err: any) {
       record('11. React CMS Studio production build bundle verification', false, err.message);
+    }
+
+    // ---------------------------------------------------------
+    // 12. GitHub Pages (github.io) URL, BasePath & .nojekyll Verification
+    // ---------------------------------------------------------
+    try {
+      const projectSite = resolvePagesUrlAndBasePath('owner', 'my-blog');
+      const userSite = resolvePagesUrlAndBasePath('owner', 'owner.github.io');
+
+      const projectOk =
+        projectSite.isUserSite === false &&
+        projectSite.basePath === '/my-blog' &&
+        projectSite.pagesUrl === 'https://owner.github.io/my-blog/';
+
+      const userOk =
+        userSite.isUserSite === true &&
+        userSite.basePath === '/' &&
+        userSite.pagesUrl === 'https://owner.github.io/';
+
+      const publicNoJekyll = path.join(PATHS.root, 'packages/site-template/public/.nojekyll');
+      const distNoJekyll = path.join(PATHS.root, 'packages/site-template/dist/.nojekyll');
+
+      const noJekyllOk = fs.existsSync(publicNoJekyll) || fs.existsSync(distNoJekyll);
+      const passed = projectOk && userOk && noJekyllOk;
+
+      record(
+        '12. GitHub Pages (github.io) URL derivation & .nojekyll asset guard',
+        passed,
+        `Project: ${projectSite.pagesUrl} (${projectSite.basePath}), User: ${userSite.pagesUrl} (${userSite.basePath}), .nojekyll: verified`
+      );
+    } catch (err: any) {
+      record('12. GitHub Pages (github.io) URL derivation & .nojekyll asset guard', false, err.message);
     }
   } finally {
     await server.close();

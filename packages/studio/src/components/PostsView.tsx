@@ -36,7 +36,7 @@ import {
   Clock,
   ArrowRight,
 } from 'lucide-react';
-import { fetchPosts, savePost, deletePost, uploadMedia } from '../api';
+import { fetchPosts, savePost, deletePost, uploadMedia, fetchConfig } from '../api';
 import { htmlToMarkdown, markdownToHtml } from '../utils/markdown';
 import type { PostItem, PostFrontmatter } from '../types';
 
@@ -70,6 +70,7 @@ export const PostsView: React.FC<PostsViewProps> = ({ onPublishTrigger }) => {
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [notification, setNotification] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+  const [pagesUrl, setPagesUrl] = useState<string | null>(null);
 
   // Initialize Tiptap
   const editor = useEditor({
@@ -87,8 +88,9 @@ export const PostsView: React.FC<PostsViewProps> = ({ onPublishTrigger }) => {
 
   const loadAllPosts = async () => {
     try {
-      const data = await fetchPosts();
-      setPosts(data);
+      const [data, cfg] = await Promise.allSettled([fetchPosts(), fetchConfig()]);
+      if (data.status === 'fulfilled') setPosts(data.value);
+      if (cfg.status === 'fulfilled' && cfg.value?.pagesUrl) setPagesUrl(cfg.value.pagesUrl);
     } catch (err: any) {
       setNotification({ type: 'error', text: err.message || 'Failed to load posts' });
     } finally {
@@ -473,6 +475,19 @@ export const PostsView: React.FC<PostsViewProps> = ({ onPublishTrigger }) => {
                 <Smartphone className="w-3.5 h-3.5" />
               </button>
             </div>
+          )}
+
+          {pagesUrl && !draft && slug && (
+            <a
+              href={`${pagesUrl.replace(/\/+$/, '')}/blog/${slug}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium border border-zinc-700/60 transition-colors"
+              title="Open live post on github.io"
+            >
+              <span>Live on github.io</span>
+              <ExternalLink className="w-3.5 h-3.5 text-zinc-400" />
+            </a>
           )}
 
           <button

@@ -10,14 +10,17 @@ import {
   Circle,
   UploadCloud,
   LogOut,
+  ArrowUpRight,
+  Globe,
 } from 'lucide-react';
-import type { StudioTab, GitStatus, UserConfig } from '../types';
+import type { StudioTab, GitStatus, UserConfig, DeploymentStatus } from '../types';
 
 interface SidebarProps {
   currentTab: StudioTab;
   onTabChange: (tab: StudioTab) => void;
   userConfig: UserConfig | null;
   gitStatus: GitStatus | null;
+  deploymentStatus?: DeploymentStatus | null;
   onOpenHistory: () => void;
   onOpenPublish: () => void;
   onLogout?: () => void;
@@ -28,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onTabChange,
   userConfig,
   gitStatus,
+  deploymentStatus,
   onOpenHistory,
   onOpenPublish,
   onLogout,
@@ -78,6 +82,74 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </a>
         )}
       </div>
+
+      {/* Live Site & Status Bar */}
+      {userConfig?.pagesUrl && (
+        <div className="px-3 pt-3">
+          {deploymentStatus?.liveStatus === 'deploying' ||
+          deploymentStatus?.latestRun?.status === 'in_progress' ||
+          deploymentStatus?.latestRun?.status === 'queued' ? (
+            <div className="p-2.5 rounded-xl bg-amber-950/30 border border-amber-800/40 text-amber-300 text-xs flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                <span className="font-medium text-[11px] truncate">Deploying github.io...</span>
+              </div>
+              {deploymentStatus?.latestRun?.html_url && (
+                <a
+                  href={deploymentStatus.latestRun.html_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-amber-400 hover:text-white shrink-0 ml-1"
+                  title="View GitHub Actions Run"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+            </div>
+          ) : deploymentStatus?.liveStatus === 'online' ? (
+            <div className="p-2 rounded-xl bg-emerald-950/30 border border-emerald-800/40 text-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <a
+                  href={userConfig.pagesUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-semibold text-[11px] truncate"
+                  title="Open Live Website on github.io"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                  <span className="truncate">Live on github.io</span>
+                  <ArrowUpRight className="w-3 h-3 shrink-0" />
+                </a>
+                <a
+                  href={`${userConfig.pagesUrl.replace(/\/+$/, '')}/api/posts.json`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                  title="Open Headless JSON API"
+                >
+                  API
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div className="p-2 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs flex items-center justify-between text-zinc-400">
+              <span className="text-[11px] font-medium flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+                <span>github.io ready</span>
+              </span>
+              <a
+                href={userConfig.pagesUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-zinc-400 hover:text-zinc-200"
+                title="Open Live Site"
+              >
+                <ArrowUpRight className="w-3 h-3" />
+              </a>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Navigation Links */}
       <nav className="p-2 space-y-0.5 flex-1">

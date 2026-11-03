@@ -41,6 +41,9 @@ export interface DeploymentStatusResult {
     updatedAt: string;
   } | null;
   totalRuns: number;
+  pagesUrl: string | null;
+  apiPostsUrl: string | null;
+  liveStatus: 'online' | 'deploying' | 'offline';
 }
 
 export interface GitCommitEntry {
@@ -268,10 +271,16 @@ export async function publishContent(message?: string): Promise<PublishResult> {
 
 export async function getDeploymentStatus(): Promise<DeploymentStatusResult> {
   const config = loadConfig();
+  const pagesUrl = config.pagesUrl || null;
+  const apiPostsUrl = pagesUrl ? `${pagesUrl.replace(/\/+$/, '')}/api/posts.json` : null;
+
   if (!config.githubToken || !config.repoOwner || !config.repoName) {
     return {
       latestRun: null,
       totalRuns: 0,
+      pagesUrl,
+      apiPostsUrl,
+      liveStatus: 'offline',
     };
   }
 
@@ -285,6 +294,28 @@ export async function getDeploymentStatus(): Promise<DeploymentStatusResult> {
     });
 
     const latest = data.workflow_runs[0];
+    const isDeploying = latest && (latest.status === 'queued' || latest.status === 'in_progress');
+
+    let liveStatus: 'online' | 'deploying' | 'offline' = isDeploying ? 'deploying' : 'offline';
+
+    if (pagesUrl && !isDeploying) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3000);
+        const checkRes = await fetch(pagesUrl, {
+          method: 'HEAD',
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        if (checkRes.status >= 200 && checkRes.status < 400) {
+          liveStatus = 'online';
+        } else if (checkRes.status === 404 && latest?.conclusion === 'success') {
+          liveStatus = 'deploying';
+        }
+      } catch {
+        // network/timeout keep existing
+      }
+    }
 
     return {
       latestRun: latest
@@ -299,11 +330,17 @@ export async function getDeploymentStatus(): Promise<DeploymentStatusResult> {
           }
         : null,
       totalRuns: data.total_count,
+      pagesUrl,
+      apiPostsUrl,
+      liveStatus,
     };
   } catch {
     return {
       latestRun: null,
       totalRuns: 0,
+      pagesUrl,
+      apiPostsUrl,
+      liveStatus: 'offline',
     };
   }
 }

@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { loadConfig, saveConfig, type CMSConfig } from '../config';
-import { provisionRepository, verifyGitHubToken } from '../services/github';
+import { provisionRepository, verifyGitHubToken, triggerWorkflowDispatchIfNeeded } from '../services/github';
 import { pushInitialScaffold } from '../services/git';
 
 export const setupRoutes: FastifyPluginAsync = async (fastify) => {
@@ -82,6 +82,9 @@ export const setupRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Configure authenticated origin and push initial monorepo scaffold to GitHub
       await pushInitialScaffold(result.owner, repoName, config.githubToken);
+
+      // Trigger GitHub Actions workflow dispatch if not automatically scheduled
+      triggerWorkflowDispatchIfNeeded(config.githubToken, result.owner, repoName).catch(() => {});
 
       return {
         success: true,

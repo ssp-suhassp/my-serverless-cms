@@ -16,7 +16,7 @@ import {
   Layers,
   ArrowRight,
 } from 'lucide-react';
-import { fetchPages, savePage, deletePage } from '../api';
+import { fetchPages, savePage, deletePage, fetchConfig } from '../api';
 import type { PageData, HeroBlock, FeaturesBlock, RichTextBlock, CtaBlock } from '../types';
 
 export const PagesView: React.FC = () => {
@@ -25,6 +25,7 @@ export const PagesView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [pagesUrl, setPagesUrl] = useState<string | null>(null);
 
   // Authoring & Preview Mode
   const [authoringMode, setAuthoringMode] = useState<'editor' | 'preview'>('editor');
@@ -56,11 +57,16 @@ export const PagesView: React.FC = () => {
 
   const loadAllPages = async () => {
     try {
-      const data = await fetchPages();
-      setPages(data);
-      const active = data.find((p) => p.slug === selectedSlug) || data[0];
-      if (active) {
-        populateFormFromPage(active);
+      const [data, cfg] = await Promise.allSettled([fetchPages(), fetchConfig()]);
+      if (data.status === 'fulfilled') {
+        setPages(data.value);
+        const active = data.value.find((p) => p.slug === selectedSlug) || data.value[0];
+        if (active) {
+          populateFormFromPage(active);
+        }
+      }
+      if (cfg.status === 'fulfilled' && cfg.value?.pagesUrl) {
+        setPagesUrl(cfg.value.pagesUrl);
       }
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message || 'Failed to load landing pages' });
@@ -343,6 +349,19 @@ export const PagesView: React.FC = () => {
             >
               <Trash2 className="w-4 h-4" />
             </button>
+          )}
+
+          {pagesUrl && (
+            <a
+              href={`${pagesUrl.replace(/\/+$/, '')}/${selectedSlug === 'home' ? '' : selectedSlug}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium border border-zinc-700/60 transition-colors"
+              title="Open live landing page on github.io"
+            >
+              <span>Live on github.io</span>
+              <ExternalLink className="w-3.5 h-3.5 text-zinc-400" />
+            </a>
           )}
 
           <button

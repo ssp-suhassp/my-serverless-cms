@@ -82,6 +82,9 @@ export interface DeploymentStatus {
     updatedAt: string;
   } | null;
   totalRuns: number;
+  pagesUrl?: string | null;
+  apiPostsUrl?: string | null;
+  liveStatus?: 'online' | 'deploying' | 'offline';
 }
 
 export interface MediaFile {

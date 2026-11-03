@@ -1,7 +1,8 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getCollection, type CollectionEntry } from 'astro:content';
-import { withBase } from '../../utils/basePath';
+import { marked } from 'marked';
+import { withBase, rewriteHtmlSubpaths } from '../../utils/basePath';
 
 export async function getStaticPaths() {
   const posts = await getCollection('posts', ({ data }) => {
@@ -19,7 +20,8 @@ interface Props {
 }
 
 const { post } = Astro.props;
-const { Content } = await post.render();
+const rawHtml = await marked.parse(post.body || '');
+const renderedHtml = rewriteHtmlSubpaths(rawHtml);
 ---
 
 <BaseLayout
@@ -75,9 +77,10 @@ const { Content } = await post.render();
       </div>
     )}
 
-    <div class="text-slate-300 space-y-6 leading-relaxed [&>h1]:text-2xl [&>h1]:font-bold [&>h1]:text-white [&>h1]:mt-8 [&>h2]:text-xl [&>h2]:font-bold [&>h2]:text-white [&>h2]:mt-6 [&>ul]:list-disc [&>ul]:pl-6 [&>ol]:list-decimal [&>ol]:pl-6 [&>p]:leading-relaxed [&>blockquote]:border-l-2 [&>blockquote]:border-indigo-500 [&>blockquote]:pl-4 [&>blockquote]:italic [&>blockquote]:text-slate-400">
-      <Content />
-    </div>
+    <div
+      class="text-slate-300 space-y-6 leading-relaxed [&>h1]:text-2xl [&>h1]:font-bold [&>h1]:text-white [&>h1]:mt-8 [&>h2]:text-xl [&>h2]:font-bold [&>h2]:text-white [&>h2]:mt-6 [&>ul]:list-disc [&>ul]:pl-6 [&>ol]:list-decimal [&>ol]:pl-6 [&>p]:leading-relaxed [&>blockquote]:border-l-2 [&>blockquote]:border-indigo-500 [&>blockquote]:pl-4 [&>blockquote]:italic [&>blockquote]:text-slate-400"
+      set:html={renderedHtml}
+    />
 
     <div class="mt-16 pt-8 border-t border-slate-800 flex items-center justify-between">
       <a

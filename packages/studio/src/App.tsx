@@ -111,6 +111,7 @@ export const App: React.FC = () => {
         onTabChange={setCurrentTab}
         userConfig={userConfig}
         gitStatus={gitStatus}
+        deploymentStatus={deploymentStatus}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onOpenPublish={() => setIsPublishOpen(true)}
         onLogout={handleLogout}

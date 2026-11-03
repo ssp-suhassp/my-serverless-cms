@@ -58,9 +58,11 @@ export async function buildServer(): Promise<FastifyInstance> {
   return server;
 }
 
-const isDirectRun =
+const isDirectRun = Boolean(
   process.argv[1] &&
-  fileURLToPath(import.meta.url).replace(/\\/g, '/') === process.argv[1].replace(/\\/g, '/');
+  !process.argv[1].includes('test-e2e') &&
+  !process.argv[1].includes('test-phase2')
+);
 
 if (isDirectRun) {
   const start = async () => {
