@@ -60,8 +60,10 @@ export async function buildServer(): Promise<FastifyInstance> {
 
 const isDirectRun = Boolean(
   process.argv[1] &&
-  !process.argv[1].includes('test-e2e') &&
-  !process.argv[1].includes('test-phase2')
+  (process.argv[1].replace(/\\/g, '/').endsWith('/src/index.ts') ||
+   process.argv[1].replace(/\\/g, '/').endsWith('/dist/index.js') ||
+   process.argv[1] === 'src/index.ts' ||
+   process.argv[1].endsWith('src\\index.ts'))
 );
 
 if (isDirectRun) {
