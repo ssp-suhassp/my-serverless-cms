@@ -1,5 +1,8 @@
 import { simpleGit, type StatusResult } from 'simple-git';
 import { Octokit } from 'octokit';
+import fs from 'node:fs';
+import path from 'node:path';
+import matter from 'gray-matter';
 import { PATHS, loadConfig, saveConfig } from '../config';
 
 const git = simpleGit(PATHS.root);
@@ -16,6 +19,7 @@ export interface GitEngineStatus {
   deleted: string[];
   staged: string[];
   hasRemote: boolean;
+  suggestedMessage: string;
 }
 
 export interface PublishResult {
@@ -69,6 +73,64 @@ export async function syncRemote(): Promise<{ success: boolean; message: string 
   }
 }
 
+export function detectContextualCommitMessage(files: string[]): string {
+  const postFiles = files.filter((f) => (f.includes('content/posts/') || f.includes('content\\posts\\')) && f.endsWith('.md'));
+  const pageFiles = files.filter((f) => (f.includes('content/pages/') || f.includes('content\\pages\\')) && f.endsWith('.json'));
+  const mediaFiles = files.filter((f) => f.includes('public/uploads/') || f.includes('public\\uploads\\') || f.includes('/uploads/'));
+
+  if (postFiles.length === 1 && pageFiles.length === 0 && mediaFiles.length === 0) {
+    const postRelPath = postFiles[0];
+    const postFullPath = path.isAbsolute(postRelPath)
+      ? postRelPath
+      : path.join(PATHS.root, postRelPath);
+
+    if (fs.existsSync(postFullPath)) {
+      try {
+        const raw = fs.readFileSync(postFullPath, 'utf-8');
+        const parsed = matter(raw);
+        const title = parsed.data.title || path.basename(postRelPath, '.md');
+        if (parsed.data.draft) {
+          return `draft(post): update "${title}"`;
+        }
+        return `publish(post): "${title}"`;
+      } catch {
+        const title = path.basename(postRelPath, '.md');
+        return `publish(post): "${title}"`;
+      }
+    }
+    const title = path.basename(postRelPath, '.md');
+    return `publish(post): "${title}"`;
+  }
+
+  if (postFiles.length > 1 && pageFiles.length === 0 && mediaFiles.length === 0) {
+    return `content(posts): update ${postFiles.length} articles`;
+  }
+
+  if (pageFiles.length === 1 && postFiles.length === 0 && mediaFiles.length === 0) {
+    const slug = path.basename(pageFiles[0], '.json');
+    return `layout(pages): update "${slug}" blocks`;
+  }
+
+  if (pageFiles.length > 1 && postFiles.length === 0 && mediaFiles.length === 0) {
+    return `layout(pages): update ${pageFiles.length} pages`;
+  }
+
+  if (mediaFiles.length === 1 && postFiles.length === 0 && pageFiles.length === 0) {
+    const filename = path.basename(mediaFiles[0]);
+    return `asset(media): upload ${filename} (transcoded WebP)`;
+  }
+
+  if (mediaFiles.length > 1 && postFiles.length === 0 && pageFiles.length === 0) {
+    return `asset(media): upload ${mediaFiles.length} media assets (transcoded WebP)`;
+  }
+
+  if (postFiles.length > 0 || pageFiles.length > 0 || mediaFiles.length > 0) {
+    return 'chore(content): sync published articles and media updates';
+  }
+
+  return 'chore(cms): sync local updates';
+}
+
 export async function getGitStatus(): Promise<GitEngineStatus> {
   const remotes = await git.getRemotes(true);
   const hasOrigin = remotes.some((r) => r.name === 'origin');
@@ -80,6 +142,14 @@ export async function getGitStatus(): Promise<GitEngineStatus> {
   }
 
   const status: StatusResult = await git.status();
+  const allChangedFiles = [
+    ...status.staged,
+    ...status.modified,
+    ...status.created,
+    ...status.not_added,
+    ...status.deleted,
+  ];
+  const suggestedMessage = detectContextualCommitMessage(allChangedFiles);
 
   return {
     isClean: status.isClean(),
@@ -93,6 +163,7 @@ export async function getGitStatus(): Promise<GitEngineStatus> {
     deleted: status.deleted,
     staged: status.staged,
     hasRemote: hasOrigin,
+    suggestedMessage,
   };
 }
 
@@ -123,7 +194,10 @@ export async function publishContent(message?: string): Promise<PublishResult> {
   ]);
 
   const currentStatus = await git.status();
-  const commitMessage = message || `chore(cms): publish content - ${new Date().toISOString()}`;
+  let commitMessage = message?.trim();
+  if (!commitMessage) {
+    commitMessage = detectContextualCommitMessage(currentStatus.staged);
+  }
 
   let commitHash: string;
 

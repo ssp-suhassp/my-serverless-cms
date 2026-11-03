@@ -56,6 +56,19 @@ export interface GitStatus {
   deleted: string[];
   staged: string[];
   hasRemote: boolean;
+  suggestedMessage?: string;
+}
+
+export interface SetupStatus {
+  authenticated: boolean;
+  configured: boolean;
+  user: {
+    login: string;
+    name: string | null;
+    avatar_url: string;
+    email: string | null;
+  } | null;
+  config: UserConfig;
 }
 
 export interface DeploymentStatus {

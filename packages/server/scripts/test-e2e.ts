@@ -50,12 +50,12 @@ async function runE2ESuite() {
     }
 
     // ---------------------------------------------------------
-    // 2. GitHub Authentication & Token Verification
+    // 2. GitHub Authentication & Onboarding Gate Verification
     // ---------------------------------------------------------
     try {
       const { token } = extractCredentialsFromEnvTest();
       if (!token) {
-        record('2. GitHub PAT authentication', false, 'Missing token in References/.env-test');
+        record('2. GitHub PAT authentication & onboarding gate', false, 'Missing token in References/.env-test');
       } else {
         const res = await fetch(`${baseUrl}/api/auth/verify`, {
           method: 'POST',
@@ -63,15 +63,27 @@ async function runE2ESuite() {
           body: JSON.stringify({ token }),
         });
         const data = await res.json();
-        const passed = res.status === 200 && data.success && !!data.user?.login;
+        const verifyOk = res.status === 200 && data.success && !!data.user?.login;
+
+        const setupRes = await fetch(`${baseUrl}/api/setup/status`);
+        const setupData = await setupRes.json();
+        const setupOk =
+          setupRes.status === 200 &&
+          typeof setupData.authenticated === 'boolean' &&
+          typeof setupData.configured === 'boolean' &&
+          setupData.config !== undefined;
+
+        const passed = verifyOk && setupOk;
         record(
-          '2. GitHub PAT authentication',
+          '2. GitHub PAT authentication & onboarding gate',
           passed,
-          passed ? `Verified identity: @${data.user.login}` : `Auth failure: ${JSON.stringify(data)}`
+          passed
+            ? `Verified identity: @${data.user.login}, Setup Gate: auth=${setupData.authenticated}, configured=${setupData.configured}`
+            : `Auth failure: ${JSON.stringify(data)}`
         );
       }
     } catch (err: any) {
-      record('2. GitHub PAT authentication', false, err.message);
+      record('2. GitHub PAT authentication & onboarding gate', false, err.message);
     }
 
     // ---------------------------------------------------------
@@ -368,7 +380,7 @@ async function runE2ESuite() {
     }
 
     // ---------------------------------------------------------
-    // 7. Git Engine Status & Remote Sync Endpoint Probe
+    // 7. Git Engine Status & Deployment Monitor Probe
     // ---------------------------------------------------------
     try {
       const gitRes = await fetch(`${baseUrl}/api/git/status`);
@@ -376,7 +388,8 @@ async function runE2ESuite() {
       const gitOk =
         gitRes.status === 200 &&
         typeof gitData.branch === 'string' &&
-        typeof gitData.isClean === 'boolean';
+        typeof gitData.isClean === 'boolean' &&
+        typeof gitData.suggestedMessage === 'string';
 
       const deployRes = await fetch(`${baseUrl}/api/git/deploy-status`);
       const deployData = await deployRes.json();
@@ -386,16 +399,39 @@ async function runE2ESuite() {
 
       const passed = gitOk && deployOk;
       record(
-        '7. Git engine status & deployment monitor probe',
+        '7. Git engine status & suggested commit probe',
         passed,
-        `Branch: '${gitData.branch}', Clean: ${gitData.isClean}, Total CI Runs: ${deployData.totalRuns}`
+        `Branch: '${gitData.branch}', Clean: ${gitData.isClean}, Suggested: "${gitData.suggestedMessage}"`
       );
     } catch (err: any) {
-      record('7. Git engine status & deployment monitor probe', false, err.message);
+      record('7. Git engine status & suggested commit probe', false, err.message);
     }
 
     // ---------------------------------------------------------
-    // 8. Git Commit History Probe (GET /api/git/history)
+    // 8. Self-Matching Intelligent Commit Generator Engine
+    // ---------------------------------------------------------
+    try {
+      const { detectContextualCommitMessage } = await import('../src/services/git');
+      const postMsg = detectContextualCommitMessage(['packages/site-template/src/content/posts/sample.md']);
+      const pageMsg = detectContextualCommitMessage(['packages/site-template/src/content/pages/home.json']);
+      const mediaMsg = detectContextualCommitMessage(['packages/site-template/public/uploads/cover.webp']);
+
+      const passed =
+        postMsg.includes('(post):') &&
+        pageMsg === 'layout(pages): update "home" blocks' &&
+        mediaMsg.includes('asset(media): upload cover.webp');
+
+      record(
+        '8. Self-matching intelligent commit generator engine',
+        passed,
+        `Post: "${postMsg}", Page: "${pageMsg}", Media: "${mediaMsg}"`
+      );
+    } catch (err: any) {
+      record('8. Self-matching intelligent commit generator engine', false, err.message);
+    }
+
+    // ---------------------------------------------------------
+    // 9. Git Commit History Probe (GET /api/git/history)
     // ---------------------------------------------------------
     try {
       const historyRes = await fetch(`${baseUrl}/api/git/history`);
@@ -408,16 +444,16 @@ async function runE2ESuite() {
         typeof historyData.commits[0].shortHash === 'string';
 
       record(
-        '8. Git commit timeline history probe',
+        '9. Git commit timeline history probe',
         passed,
         `Retrieved ${historyData.commits?.length || 0} commits, latest: [${historyData.commits?.[0]?.shortHash || 'n/a'}]`
       );
     } catch (err: any) {
-      record('8. Git commit timeline history probe', false, err.message);
+      record('9. Git commit timeline history probe', false, err.message);
     }
 
     // ---------------------------------------------------------
-    // 9. Static Site Template & Headless JSON API Verification
+    // 10. Static Site Template & Headless JSON API Verification
     // ---------------------------------------------------------
     try {
       const distDir = path.resolve(__dirname, '../../site-template/dist');
@@ -462,16 +498,16 @@ async function runE2ESuite() {
         Array.isArray(parsedTagsData.tags);
 
       record(
-        '9. Astro Headless JSON API & static site build verification',
+        '10. Astro Headless JSON API & static site build verification',
         passed,
         `API outputs: posts.json (${parsedPostsData.posts?.length || 0} posts), home.json (${parsedHome.blocks?.length || 0} blocks), tags.json (${parsedTagsData.tags?.length || 0} tags)`
       );
     } catch (err: any) {
-      record('9. Astro Headless JSON API & static site build verification', false, err.message);
+      record('10. Astro Headless JSON API & static site build verification', false, err.message);
     }
 
     // ---------------------------------------------------------
-    // 10. React Studio Production Build Verification
+    // 11. React Studio Production Build Verification
     // ---------------------------------------------------------
     try {
       const studioDistHtml = path.resolve(__dirname, '../../studio/dist/index.html');
@@ -486,12 +522,12 @@ async function runE2ESuite() {
       const passed = fs.existsSync(studioDistHtml) && studioHtmlContent.includes('<div id="root">');
 
       record(
-        '10. React CMS Studio production build bundle verification',
+        '11. React CMS Studio production build bundle verification',
         passed,
         `Studio dist/index.html verified (${studioHtmlContent.length} bytes)`
       );
     } catch (err: any) {
-      record('10. React CMS Studio production build bundle verification', false, err.message);
+      record('11. React CMS Studio production build bundle verification', false, err.message);
     }
   } finally {
     await server.close();

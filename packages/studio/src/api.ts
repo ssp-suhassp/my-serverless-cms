@@ -6,9 +6,15 @@ import type {
   MediaFile,
   UserConfig,
   PostFrontmatter,
+  SetupStatus,
 } from './types';
 
 const API_BASE = '/api';
+
+export async function fetchSetupStatus(): Promise<SetupStatus> {
+  const res = await fetch(`${API_BASE}/setup/status`);
+  return res.json();
+}
 
 export async function fetchHealth(): Promise<{ status: string; service: string }> {
   const res = await fetch('/health');

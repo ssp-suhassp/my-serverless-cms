@@ -5,14 +5,21 @@ export default {
   theme: {
     extend: {
       colors: {
-        studio: {
-          950: '#090d16',
-          900: '#0f172a',
-          850: '#131e36',
-          800: '#1e293b',
-          700: '#334155',
-          600: '#475569',
+        ghost: {
+          canvas: '#0d0f12',
+          surface: '#14171c',
+          card: '#161a20',
+          border: '#1e232b',
+          borderSubtle: '#181c24',
+          input: '#12151a',
+          hover: '#1b2027',
+          active: '#242a34',
         },
+      },
+      fontFamily: {
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        serif: ['Newsreader', 'Georgia', 'Cambria', 'Times New Roman', 'serif'],
+        mono: ['JetBrains Mono', 'Fira Code', 'Menlo', 'Monaco', 'Courier New', 'monospace'],
       },
     },
   },

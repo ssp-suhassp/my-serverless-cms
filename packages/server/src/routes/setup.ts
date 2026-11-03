@@ -1,8 +1,35 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { loadConfig, saveConfig, type CMSConfig } from '../config';
-import { provisionRepository } from '../services/github';
+import { provisionRepository, verifyGitHubToken } from '../services/github';
 
 export const setupRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.get('/status', async () => {
+    const config = loadConfig();
+    const hasToken = Boolean(config.githubToken);
+    const hasRepo = Boolean(config.repoOwner && config.repoName);
+
+    let user = null;
+    if (hasToken && config.githubToken) {
+      try {
+        user = await verifyGitHubToken(config.githubToken);
+      } catch {}
+    }
+
+    return {
+      authenticated: hasToken && Boolean(user),
+      configured: hasToken && hasRepo,
+      user,
+      config: {
+        siteTitle: config.siteTitle || 'My Serverless CMS Site',
+        repoOwner: config.repoOwner,
+        repoName: config.repoName,
+        pagesUrl: config.pagesUrl,
+        basePath: config.basePath || '/',
+        hasToken,
+      },
+    };
+  });
+
   fastify.get('/config', async () => {
     const config = loadConfig();
     return {

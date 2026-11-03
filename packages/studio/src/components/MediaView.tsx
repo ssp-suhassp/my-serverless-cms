@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Clock,
   HardDrive,
+  CheckCircle2,
 } from 'lucide-react';
 import { fetchMedia, uploadMedia, deleteMedia, cleanupOrphanMedia } from '../api';
 import type { MediaFile } from '../types';
@@ -100,14 +101,13 @@ export const MediaView: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-slate-950">
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#0d0f12]">
       {/* Top Media Bar */}
-      <div className="h-14 border-b border-slate-800 px-6 flex items-center justify-between bg-slate-900/30 shrink-0">
+      <div className="h-16 border-b border-zinc-800/80 px-8 flex items-center justify-between bg-[#14171c]/50 shrink-0">
         <div className="flex items-center gap-3">
-          <FileImage className="w-4 h-4 text-indigo-400" />
-          <h2 className="text-sm font-bold text-white">Media Asset Library</h2>
-          <span className="text-xs font-mono text-slate-500 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-            {files.length} asset(s)
+          <h1 className="text-base font-semibold text-zinc-100">Media Asset Library</h1>
+          <span className="text-xs font-mono text-zinc-400 bg-[#101317] px-2 py-0.5 rounded border border-zinc-800">
+            {files.length} WebP asset(s)
           </span>
         </div>
 
@@ -115,15 +115,15 @@ export const MediaView: React.FC = () => {
           <button
             onClick={handleCleanupOrphans}
             disabled={cleaning}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#14171c] hover:bg-zinc-800 text-zinc-300 text-xs font-medium border border-zinc-800 transition-colors"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>{cleaning ? 'Scanning...' : 'Clean Orphaned Media'}</span>
+            <Sparkles className="w-3.5 h-3.5 text-zinc-400" />
+            <span>{cleaning ? 'Scanning...' : 'Clean Orphan Media'}</span>
           </button>
 
-          <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/20 transition-all hover:scale-105">
-            <Upload className="w-4 h-4" />
-            <span>{uploading ? 'Transcoding WebP...' : 'Upload Asset'}</span>
+          <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-medium shadow-sm transition-all">
+            <Upload className="w-3.5 h-3.5" />
+            <span>{uploading ? 'Transcoding WebP...' : 'Upload Image'}</span>
             <input
               type="file"
               accept="image/*"
@@ -138,31 +138,29 @@ export const MediaView: React.FC = () => {
       {/* Feedback Banner */}
       {feedback && (
         <div
-          className={`px-6 py-3 border-b text-xs flex items-center gap-3 ${
+          className={`px-8 py-2.5 border-b text-xs flex items-center gap-2.5 ${
             feedback.type === 'error'
-              ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
-              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+              ? 'bg-red-950/30 border-red-900/50 text-red-300'
+              : 'bg-emerald-950/30 border-emerald-900/50 text-emerald-300'
           }`}
         >
           {feedback.type === 'error' ? (
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
           ) : (
-            <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           )}
           <span>{feedback.message}</span>
         </div>
       )}
 
-      {/* Media Grid */}
-      <div className="flex-1 overflow-y-auto p-6 sm:p-8">
+      {/* Asset Grid */}
+      <div className="flex-1 overflow-y-auto p-8">
         {files.length === 0 ? (
-          <div className="max-w-md mx-auto text-center py-20 space-y-4">
-            <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-600">
-              <FileImage className="w-8 h-8" />
-            </div>
-            <h3 className="text-base font-bold text-white">No Media Uploaded Yet</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Upload raw PNG, JPEG, or TIFF photos. They will be automatically transcoded to high-efficiency WebP assets at 85% quality on localhost.
+          <div className="py-24 text-center space-y-3">
+            <FileImage className="w-12 h-12 text-zinc-600 mx-auto" />
+            <h3 className="text-sm font-semibold text-zinc-200">No media assets found</h3>
+            <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+              Images are automatically transcoded to WebP (max 1920px, 85 quality) and stored in public/uploads.
             </p>
           </div>
         ) : (
@@ -170,61 +168,46 @@ export const MediaView: React.FC = () => {
             {files.map((file) => (
               <div
                 key={file.filename}
-                className="group relative rounded-2xl bg-slate-900/60 border border-slate-800 overflow-hidden flex flex-col hover:border-slate-700 transition-all"
+                className="group relative bg-[#14171c] border border-zinc-800 rounded-xl overflow-hidden hover:border-zinc-700 transition-all flex flex-col shadow-sm"
               >
                 {/* Thumbnail */}
-                <div className="aspect-video bg-slate-950 relative overflow-hidden flex items-center justify-center">
+                <div className="aspect-video w-full bg-[#101317] flex items-center justify-center overflow-hidden relative">
                   <img
                     src={file.url}
                     alt={file.filename}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     loading="lazy"
                   />
-                  <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur text-[10px] font-mono text-indigo-300 uppercase">
-                    WebP
-                  </span>
-                </div>
-
-                {/* Details */}
-                <div className="p-3 space-y-1.5">
-                  <p className="text-xs font-semibold text-white truncate" title={file.filename}>
-                    {file.filename}
-                  </p>
-                  <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
-                    <span className="flex items-center gap-1">
-                      <HardDrive className="w-3 h-3" /> {formatSize(file.size)}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> {new Date(file.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="pt-2 flex items-center gap-1.5 border-t border-slate-800/80">
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                     <button
                       onClick={() => copyPath(file.url)}
-                      className="flex-1 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-semibold flex items-center justify-center gap-1 transition-colors"
-                      title="Copy relative path for Markdown"
+                      className="p-1.5 rounded-lg bg-zinc-800/90 text-white hover:bg-zinc-700 transition-colors"
+                      title="Copy asset path"
                     >
                       {copiedName === file.url ? (
-                        <>
-                          <Check className="w-3 h-3 text-emerald-400" />
-                          <span className="text-emerald-400">Copied</span>
-                        </>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
                       ) : (
-                        <>
-                          <Copy className="w-3 h-3" />
-                          <span>Copy Path</span>
-                        </>
+                        <Copy className="w-3.5 h-3.5" />
                       )}
                     </button>
                     <button
                       onClick={() => handleDelete(file.filename)}
-                      className="p-1 rounded-lg hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 transition-colors"
+                      className="p-1.5 rounded-lg bg-red-900/90 text-white hover:bg-red-800 transition-colors"
                       title="Delete asset"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
+                  </div>
+                </div>
+
+                {/* Meta details */}
+                <div className="p-3 space-y-1">
+                  <h4 className="text-xs font-medium text-zinc-200 truncate" title={file.filename}>
+                    {file.filename}
+                  </h4>
+                  <div className="flex items-center justify-between text-[11px] text-zinc-500 font-mono">
+                    <span>{formatSize(file.size)}</span>
+                    <span className="uppercase text-[10px] text-zinc-400">WebP</span>
                   </div>
                 </div>
               </div>
@@ -235,4 +218,3 @@ export const MediaView: React.FC = () => {
     </div>
   );
 };
-

@@ -10,36 +10,53 @@ import {
   Trash2,
   Save,
   Eye,
-  Code,
   FileEdit,
   Tag,
   Upload,
   Calendar,
   User,
-  AlertCircle,
+  Settings as SettingsIcon,
+  ChevronLeft,
+  X,
+  ExternalLink,
+  Smartphone,
+  Monitor,
   CheckCircle2,
+  AlertCircle,
   Bold,
   Italic,
   List,
   ListOrdered,
   Quote,
-  Heading1,
   Heading2,
-  Link as LinkIcon,
-  ExternalLink,
+  Heading3,
   Image as ImageIcon,
+  Code,
+  Link as LinkIcon,
+  Clock,
+  ArrowRight,
 } from 'lucide-react';
 import { fetchPosts, savePost, deletePost, uploadMedia } from '../api';
 import { htmlToMarkdown, markdownToHtml } from '../utils/markdown';
 import type { PostItem, PostFrontmatter } from '../types';
 
-export const PostsView: React.FC = () => {
-  const [posts, setPosts] = useState<PostItem[]>([]);
-  const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [editorMode, setEditorMode] = useState<'wysiwyg' | 'markdown' | 'preview'>('wysiwyg');
+interface PostsViewProps {
+  onPublishTrigger?: () => void;
+}
 
-  // Form State
+export const PostsView: React.FC<PostsViewProps> = ({ onPublishTrigger }) => {
+  const [posts, setPosts] = useState<PostItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedPost, setSelectedPost] = useState<PostItem | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterDraft, setFilterDraft] = useState<'all' | 'published' | 'draft'>('all');
+
+  // Editor View State
+  const [authoringMode, setAuthoringMode] = useState<'editor' | 'preview'>('editor');
+  const [previewViewport, setPreviewViewport] = useState<'desktop' | 'mobile'>('desktop');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Post State
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [date, setDate] = useState('');
@@ -52,14 +69,15 @@ export const PostsView: React.FC = () => {
 
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; message: string; issues?: any[] } | null>(null);
+  const [notification, setNotification] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
 
+  // Initialize Tiptap
   const editor = useEditor({
     extensions: [
       StarterKit,
       ImageExtension.configure({ inline: true }),
       LinkExtension.configure({ openOnClick: false }),
-      Placeholder.configure({ placeholder: 'Write your story in rich text or raw Markdown...' }),
+      Placeholder.configure({ placeholder: 'Begin writing your story...' }),
     ],
     content: '',
     onUpdate: ({ editor }) => {
@@ -71,11 +89,10 @@ export const PostsView: React.FC = () => {
     try {
       const data = await fetchPosts();
       setPosts(data);
-      if (data.length > 0 && !selectedSlug) {
-        selectPost(data[0]);
-      }
     } catch (err: any) {
-      setFeedback({ type: 'error', message: err.message || 'Failed to load posts' });
+      setNotification({ type: 'error', text: err.message || 'Failed to load posts' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -83,8 +100,8 @@ export const PostsView: React.FC = () => {
     loadAllPosts();
   }, []);
 
-  const selectPost = (p: PostItem) => {
-    setSelectedSlug(p.slug);
+  const handleSelectPost = (p: PostItem) => {
+    setSelectedPost(p);
     setTitle(p.frontmatter.title || '');
     setSlug(p.frontmatter.slug || p.slug);
     setDate(p.frontmatter.date || new Date().toISOString().slice(0, 10));
@@ -98,74 +115,74 @@ export const PostsView: React.FC = () => {
     if (editor) {
       editor.commands.setContent(markdownToHtml(p.body || ''));
     }
-    setFeedback(null);
+    setAuthoringMode('editor');
+    setIsSettingsOpen(false);
+    setNotification(null);
   };
 
   const handleCreateNew = () => {
     const today = new Date().toISOString().slice(0, 10);
-    const newSlug = `new-article-${Date.now().toString().slice(-4)}`;
-    const initialMd = '# Untitled Article\n\nStart writing your content here...';
-    setSelectedSlug(null);
-    setTitle('Untitled Article');
+    const newSlug = `new-story-${Date.now().toString().slice(-4)}`;
+    const newPostItem: PostItem = {
+      slug: newSlug,
+      frontmatter: {
+        title: '',
+        slug: newSlug,
+        date: today,
+        author: 'Admin',
+        excerpt: '',
+        tags: [],
+        draft: true,
+      },
+      body: '',
+    };
+
+    setSelectedPost(newPostItem);
+    setTitle('');
     setSlug(newSlug);
     setDate(today);
     setAuthor('Admin');
-    setExcerpt('Brief summary of this article...');
-    setTagsInput('general');
+    setExcerpt('');
+    setTagsInput('');
     setCoverImage('');
     setDraft(true);
-    setMarkdownBody(initialMd);
+    setMarkdownBody('');
 
     if (editor) {
-      editor.commands.setContent(markdownToHtml(initialMd));
+      editor.commands.setContent('');
     }
-    setFeedback(null);
+    setAuthoringMode('editor');
+    setIsSettingsOpen(false);
+    setNotification(null);
   };
 
-  const handleModeSwitch = (newMode: 'wysiwyg' | 'markdown' | 'preview') => {
-    if (newMode === editorMode) return;
-
-    if (editorMode === 'wysiwyg' && editor) {
-      const convertedMd = htmlToMarkdown(editor.getHTML());
-      setMarkdownBody(convertedMd);
-    } else if (editorMode === 'markdown' && editor && newMode === 'wysiwyg') {
-      editor.commands.setContent(markdownToHtml(markdownBody));
-    }
-
-    setEditorMode(newMode);
-  };
-
-  const handleInsertImage = () => {
-    const url = window.prompt('Enter image URL or path (e.g., /uploads/diagram.webp):');
-    if (url && editor) {
-      editor.chain().focus().setImage({ src: url }).run();
-    }
-  };
-
-  const handleSave = async () => {
+  const handleSave = async (draftOverride?: boolean) => {
     setSaving(true);
-    setFeedback(null);
+    setNotification(null);
+
+    const isDraftVal = draftOverride !== undefined ? draftOverride : draft;
+    if (draftOverride !== undefined) {
+      setDraft(draftOverride);
+    }
 
     const tags = tagsInput
       .split(',')
       .map((t) => t.trim().toLowerCase())
       .filter(Boolean);
 
+    const cleanSlug = slug.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-') || `story-${Date.now()}`;
     const frontmatter: PostFrontmatter = {
-      title,
-      slug: slug.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-'),
+      title: title.trim() || 'Untitled Story',
+      slug: cleanSlug,
       date,
       author,
       excerpt,
       coverImage: coverImage || undefined,
       tags,
-      draft,
+      draft: isDraftVal,
     };
 
-    const bodyToSave =
-      editorMode === 'wysiwyg' && editor
-        ? htmlToMarkdown(editor.getHTML())
-        : markdownBody;
+    const bodyToSave = editor ? htmlToMarkdown(editor.getHTML()) : markdownBody;
 
     try {
       await savePost({
@@ -173,14 +190,16 @@ export const PostsView: React.FC = () => {
         body: bodyToSave,
       });
 
-      setFeedback({ type: 'success', message: 'Article saved and validated successfully!' });
+      setNotification({
+        type: 'success',
+        text: isDraftVal ? 'Draft saved locally.' : 'Story published to local Git repository.',
+      });
       await loadAllPosts();
-      setSelectedSlug(frontmatter.slug);
+      setSlug(cleanSlug);
     } catch (err: any) {
-      setFeedback({
+      setNotification({
         type: 'error',
-        message: err.error || 'Failed to save post',
-        issues: err.issues,
+        text: err.issues?.[0]?.message || err.error || 'Failed to save post.',
       });
     } finally {
       setSaving(false);
@@ -188,18 +207,18 @@ export const PostsView: React.FC = () => {
   };
 
   const handleDelete = async (slugToDelete: string) => {
-    if (!window.confirm(`Are you sure you want to delete post "${slugToDelete}"?`)) {
+    if (!window.confirm(`Delete post "${slugToDelete}"? This removes the Markdown file.`)) {
       return;
     }
 
     try {
       await deletePost(slugToDelete);
       await loadAllPosts();
-      if (selectedSlug === slugToDelete) {
-        handleCreateNew();
+      if (selectedPost?.slug === slugToDelete) {
+        setSelectedPost(null);
       }
     } catch (err: any) {
-      setFeedback({ type: 'error', message: err.message || 'Failed to delete post' });
+      setNotification({ type: 'error', text: err.message || 'Failed to delete post' });
     }
   };
 
@@ -214,184 +233,319 @@ export const PostsView: React.FC = () => {
         setCoverImage(res.media.url);
       }
     } catch (err: any) {
-      setFeedback({ type: 'error', message: 'Failed to upload cover image' });
+      setNotification({ type: 'error', text: 'Failed to upload image' });
     } finally {
       setUploadingImage(false);
     }
   };
 
+  const handleInsertEditorImage = () => {
+    const url = window.prompt('Enter image URL or local asset path (e.g., /uploads/image.webp):');
+    if (url && editor) {
+      editor.chain().focus().setImage({ src: url }).run();
+    }
+  };
+
   const filteredPosts = posts.filter((p) => {
     const q = searchQuery.toLowerCase();
-    return (
+    const matchesQuery =
       p.frontmatter.title?.toLowerCase().includes(q) ||
       p.slug.toLowerCase().includes(q) ||
-      p.frontmatter.tags?.some((t) => t.toLowerCase().includes(q))
-    );
+      p.frontmatter.tags?.some((t) => t.toLowerCase().includes(q));
+
+    if (filterDraft === 'published') return matchesQuery && !p.frontmatter.draft;
+    if (filterDraft === 'draft') return matchesQuery && p.frontmatter.draft;
+    return matchesQuery;
   });
 
-  return (
-    <div className="flex-1 flex overflow-hidden">
-      {/* Posts Sidebar */}
-      <aside className="w-80 border-r border-slate-800 bg-slate-900/40 flex flex-col shrink-0">
-        <div className="p-4 border-b border-slate-800 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Articles ({posts.length})
-            </span>
-            <button
-              onClick={handleCreateNew}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition-all"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>New</span>
-            </button>
-          </div>
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
-            <input
-              type="text"
-              placeholder="Search posts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500"
-            />
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60 p-2 space-y-1">
-          {filteredPosts.map((p) => {
-            const isSelected = p.slug === selectedSlug;
-            return (
-              <div
-                key={p.slug}
-                onClick={() => selectPost(p)}
-                className={`p-3 rounded-xl cursor-pointer transition-all ${
-                  isSelected
-                    ? 'bg-indigo-600/10 border border-indigo-500/30 text-white'
-                    : 'hover:bg-slate-800/40 text-slate-400'
+  // =========================================================================
+  // VIEW 1: Post Index List (Ghost Style Table)
+  // =========================================================================
+  if (!selectedPost) {
+    return (
+      <div className="flex-1 flex flex-col bg-[#0d0f12] overflow-hidden">
+        {/* Header Bar */}
+        <div className="h-16 border-b border-zinc-800/80 px-8 flex items-center justify-between bg-[#14171c]/50">
+          <div className="flex items-center gap-4">
+            <h1 className="text-base font-semibold text-zinc-100">Posts</h1>
+            <div className="flex items-center gap-1 bg-[#101317] p-1 rounded-lg border border-zinc-800 text-xs">
+              <button
+                onClick={() => setFilterDraft('all')}
+                className={`px-2.5 py-1 rounded-md transition-colors ${
+                  filterDraft === 'all'
+                    ? 'bg-zinc-800 text-zinc-100 font-medium'
+                    : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <h4 className="text-xs font-semibold text-slate-200 line-clamp-1">
-                    {p.frontmatter.title}
-                  </h4>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(p.slug);
-                    }}
-                    className="text-slate-600 hover:text-rose-400 p-0.5 rounded transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 mt-2 text-[10px]">
-                  <span>{p.frontmatter.date}</span>
-                  <span>•</span>
-                  {p.frontmatter.draft ? (
-                    <span className="px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase font-semibold">
-                      Draft
-                    </span>
-                  ) : (
-                    <span className="px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase font-semibold">
-                      Live
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </aside>
-
-      {/* Editor & Frontmatter Workspace */}
-      <main className="flex-1 flex flex-col overflow-hidden bg-slate-950">
-        {/* Workspace Top Toolbar */}
-        <div className="h-14 border-b border-slate-800 px-6 flex items-center justify-between bg-slate-900/30 shrink-0">
-          <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
-            <button
-              onClick={() => handleModeSwitch('wysiwyg')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                editorMode === 'wysiwyg'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <FileEdit className="w-3.5 h-3.5" />
-              <span>WYSIWYG</span>
-            </button>
-            <button
-              onClick={() => handleModeSwitch('markdown')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                editorMode === 'markdown'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Code className="w-3.5 h-3.5" />
-              <span>Raw Markdown</span>
-            </button>
-            <button
-              onClick={() => handleModeSwitch('preview')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                editorMode === 'preview'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Eye className="w-3.5 h-3.5" />
-              <span>Live Astro</span>
-            </button>
+                All ({posts.length})
+              </button>
+              <button
+                onClick={() => setFilterDraft('published')}
+                className={`px-2.5 py-1 rounded-md transition-colors ${
+                  filterDraft === 'published'
+                    ? 'bg-zinc-800 text-zinc-100 font-medium'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                Published
+              </button>
+              <button
+                onClick={() => setFilterDraft('draft')}
+                className={`px-2.5 py-1 rounded-md transition-colors ${
+                  filterDraft === 'draft'
+                    ? 'bg-zinc-800 text-zinc-100 font-medium'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                Drafts
+              </button>
+            </div>
           </div>
 
+          <div className="flex items-center gap-3">
+            <div className="relative w-64">
+              <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-3" />
+              <input
+                type="text"
+                placeholder="Search posts..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-[#101317] border border-zinc-800 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-600"
+              />
+            </div>
+            <button
+              onClick={handleCreateNew}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-white text-zinc-900 font-medium text-xs shadow-sm transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>New post</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Posts Table */}
+        <div className="flex-1 overflow-y-auto px-8 py-6">
+          {filteredPosts.length === 0 ? (
+            <div className="py-24 text-center space-y-3">
+              <p className="text-zinc-400 text-sm">No posts found matching your criteria.</p>
+              <button
+                onClick={handleCreateNew}
+                className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium"
+              >
+                Create your first story
+              </button>
+            </div>
+          ) : (
+            <div className="border border-zinc-800/80 rounded-xl overflow-hidden bg-[#14171c]/30">
+              <div className="divide-y divide-zinc-800/60">
+                {filteredPosts.map((post) => (
+                  <div
+                    key={post.slug}
+                    onClick={() => handleSelectPost(post)}
+                    className="p-4 hover:bg-[#181c22] cursor-pointer transition-colors flex items-center justify-between group"
+                  >
+                    <div className="space-y-1 min-w-0 flex-1 pr-6">
+                      <div className="flex items-center gap-2.5">
+                        <h3 className="text-sm font-medium text-zinc-100 truncate group-hover:text-white">
+                          {post.frontmatter.title || 'Untitled Post'}
+                        </h3>
+                        {post.frontmatter.draft ? (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-950/60 text-amber-400 border border-amber-800/40 uppercase tracking-wider">
+                            Draft
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 uppercase tracking-wider">
+                            Published
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-zinc-400 line-clamp-1 font-sans">
+                        {post.frontmatter.excerpt || post.body?.slice(0, 120) || 'No excerpt available.'}
+                      </p>
+                      <div className="flex items-center gap-3 text-[11px] text-zinc-500 font-mono pt-0.5">
+                        <span>{post.frontmatter.date}</span>
+                        <span>•</span>
+                        <span>By {post.frontmatter.author || 'Admin'}</span>
+                        {post.frontmatter.tags && post.frontmatter.tags.length > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="text-zinc-400">{post.frontmatter.tags.join(', ')}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(post.slug);
+                        }}
+                        className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-800/60 transition-colors"
+                        title="Delete post"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // VIEW 2: Distraction-Free Editor & Preview Canvas
+  // =========================================================================
+  return (
+    <div className="flex-1 flex flex-col bg-[#0d0f12] overflow-hidden relative">
+      {/* Editorial Header Bar */}
+      <header className="h-14 border-b border-zinc-800/80 px-6 flex items-center justify-between bg-[#14171c]/70 backdrop-blur shrink-0 z-20">
+        {/* Left: Back & Breadcrumb */}
+        <div className="flex items-center gap-3">
           <button
-            onClick={handleSave}
-            disabled={saving}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/20 transition-all hover:scale-105"
+            onClick={() => setSelectedPost(null)}
+            className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-100 transition-colors py-1 px-1.5 rounded hover:bg-zinc-800/60"
           >
-            <Save className="w-4 h-4" />
-            <span>{saving ? 'Validating & Saving...' : 'Save Article'}</span>
+            <ChevronLeft className="w-4 h-4" />
+            <span>Posts</span>
+          </button>
+          <span className="text-zinc-600">/</span>
+          <span className="text-xs text-zinc-300 font-mono truncate max-w-xs">
+            {slug}
+          </span>
+          {draft ? (
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-950/60 text-amber-400 border border-amber-800/40 uppercase">
+              Draft
+            </span>
+          ) : (
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 uppercase">
+              Published
+            </span>
+          )}
+        </div>
+
+        {/* Center: Editor / Preview Mode Switcher */}
+        <div className="flex items-center bg-[#101317] p-1 rounded-lg border border-zinc-800 text-xs">
+          <button
+            onClick={() => setAuthoringMode('editor')}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition-all ${
+              authoringMode === 'editor'
+                ? 'bg-zinc-800 text-zinc-100 font-medium'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <FileEdit className="w-3.5 h-3.5" />
+            <span>Editor</span>
+          </button>
+          <button
+            onClick={() => setAuthoringMode('preview')}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition-all ${
+              authoringMode === 'preview'
+                ? 'bg-zinc-800 text-zinc-100 font-medium'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>Preview</span>
           </button>
         </div>
 
-        {/* Validation Feedback Banner */}
-        {feedback && (
-          <div
-            className={`px-6 py-3 border-b text-xs flex items-center gap-3 ${
-              feedback.type === 'error'
-                ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
-                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-            }`}
-          >
-            {feedback.type === 'error' ? (
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-            ) : (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            )}
-            <div className="flex-1">
-              <span className="font-semibold">{feedback.message}</span>
-              {feedback.issues && (
-                <span className="ml-2 font-mono">
-                  ({feedback.issues.map((i) => `${i.field}: ${i.message}`).join(', ')})
-                </span>
-              )}
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2">
+          {authoringMode === 'preview' && (
+            <div className="flex items-center bg-[#101317] p-1 rounded-lg border border-zinc-800 text-xs mr-2">
+              <button
+                onClick={() => setPreviewViewport('desktop')}
+                className={`p-1 rounded ${previewViewport === 'desktop' ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400'}`}
+                title="Desktop viewport"
+              >
+                <Monitor className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setPreviewViewport('mobile')}
+                className={`p-1 rounded ${previewViewport === 'mobile' ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400'}`}
+                title="Mobile viewport"
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+              </button>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Editor Body */}
-        <div className="flex-1 overflow-y-auto flex">
-          {/* Main Editing Column */}
-          <div className="flex-1 flex flex-col p-6 sm:p-8 max-w-4xl mx-auto w-full space-y-6">
-            {/* Title & Slug Header */}
-            <div className="space-y-3">
+          <button
+            onClick={() => handleSave()}
+            disabled={saving}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700/60 transition-colors"
+          >
+            <Save className="w-3.5 h-3.5" />
+            <span>{saving ? 'Saving...' : 'Save Draft'}</span>
+          </button>
+
+          <button
+            onClick={() => handleSave(false)}
+            disabled={saving}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-semibold shadow-sm transition-all"
+          >
+            <span>Publish</span>
+          </button>
+
+          <button
+            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+            className={`p-1.5 rounded-lg border transition-colors ${
+              isSettingsOpen
+                ? 'bg-zinc-800 border-zinc-700 text-zinc-100'
+                : 'bg-transparent border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+            }`}
+            title="Post Settings"
+          >
+            <SettingsIcon className="w-4 h-4" />
+          </button>
+        </div>
+      </header>
+
+      {/* Notification Toast */}
+      {notification && (
+        <div
+          className={`px-6 py-2.5 border-b text-xs flex items-center justify-between ${
+            notification.type === 'error'
+              ? 'bg-red-950/40 border-red-900/50 text-red-300'
+              : 'bg-emerald-950/40 border-emerald-900/50 text-emerald-300'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {notification.type === 'error' ? (
+              <AlertCircle className="w-4 h-4 text-red-400" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            )}
+            <span>{notification.text}</span>
+          </div>
+          <button onClick={() => setNotification(null)} className="text-zinc-400 hover:text-zinc-200">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Workspace Area */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Main Canvas */}
+        <div className="flex-1 flex flex-col overflow-y-auto">
+          {authoringMode === 'editor' ? (
+            /* ======================================================== */
+            /* Ghost Style Editor Canvas                               */
+            /* ======================================================== */
+            <div className="max-w-3xl w-full mx-auto px-6 py-12 space-y-6">
+              {/* Document Title */}
               <input
                 type="text"
-                placeholder="Article Title..."
+                placeholder="Story Title"
                 value={title}
                 onChange={(e) => {
                   setTitle(e.target.value);
-                  if (!selectedSlug) {
+                  if (selectedPost && selectedPost.slug.startsWith('new-story-')) {
                     setSlug(
                       e.target.value
                         .toLowerCase()
@@ -400,205 +554,238 @@ export const PostsView: React.FC = () => {
                     );
                   }
                 }}
-                className="w-full text-3xl sm:text-4xl font-extrabold text-white bg-transparent outline-none placeholder:text-slate-700 tracking-tight"
+                className="w-full text-4xl font-bold text-zinc-100 bg-transparent border-none outline-none placeholder:text-zinc-600 tracking-tight"
               />
-              <div className="flex items-center gap-2 text-xs font-mono text-slate-500">
-                <span>/blog/</span>
-                <input
-                  type="text"
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
-                  className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-indigo-400 outline-none focus:border-indigo-500"
-                />
-              </div>
-            </div>
 
-            {/* Frontmatter Metadata Drawer */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 text-xs">
-              <div className="space-y-1">
-                <label className="text-slate-400 font-medium flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5" /> Date (YYYY-MM-DD)
-                </label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-slate-400 font-medium flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5" /> Author
-                </label>
-                <input
-                  type="text"
-                  value={author}
-                  onChange={(e) => setAuthor(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="space-y-1 md:col-span-2">
-                <div className="flex items-center justify-between text-slate-400 font-medium">
-                  <span>Excerpt (Max 280 chars)</span>
-                  <span className={excerpt.length > 280 ? 'text-rose-400 font-bold' : ''}>
-                    {excerpt.length}/280
-                  </span>
-                </div>
-                <textarea
-                  rows={2}
-                  value={excerpt}
-                  onChange={(e) => setExcerpt(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-slate-400 font-medium flex items-center gap-1.5">
-                  <Tag className="w-3.5 h-3.5" /> Tags (comma-separated)
-                </label>
-                <input
-                  type="text"
-                  placeholder="tech, astro, git"
-                  value={tagsInput}
-                  onChange={(e) => setTagsInput(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-slate-400 font-medium flex items-center justify-between">
-                  <span>Draft Status</span>
-                  <span className="font-mono text-indigo-400">{draft ? 'Draft' : 'Published'}</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setDraft(!draft)}
-                  className={`w-full py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                    draft
-                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                  }`}
-                >
-                  {draft ? 'Hidden from Production' : 'Ready for SSG Generation'}
-                </button>
-              </div>
-
-              <div className="space-y-1 md:col-span-2">
-                <label className="text-slate-400 font-medium flex items-center gap-1.5">
-                  <Upload className="w-3.5 h-3.5" /> Cover Image (WebP Transcoded)
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    placeholder="/uploads/cover.webp"
-                    value={coverImage}
-                    onChange={(e) => setCoverImage(e.target.value)}
-                    className="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none font-mono text-xs"
-                  />
-                  <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-colors">
-                    <span>{uploadingImage ? 'Transcoding...' : 'Upload Image'}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleCoverUpload}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Editor Workspace Switcher */}
-            {editorMode === 'wysiwyg' && editor && (
-              <div className="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/30 flex flex-col">
-                {/* Tiptap Toolbar */}
-                <div className="p-2 border-b border-slate-800 bg-slate-900/60 flex flex-wrap items-center gap-1">
+              {/* Minimal Formatting Rail */}
+              {editor && (
+                <div className="sticky top-2 z-10 p-1 rounded-lg bg-[#14171c]/95 backdrop-blur border border-zinc-800 flex items-center gap-1 w-fit shadow-md">
                   <button
                     onClick={() => editor.chain().focus().toggleBold().run()}
-                    className={`p-1.5 rounded ${editor.isActive('bold') ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                    className={`p-1.5 rounded ${editor.isActive('bold') ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 hover:text-zinc-200'}`}
+                    title="Bold"
                   >
-                    <Bold className="w-4 h-4" />
+                    <Bold className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => editor.chain().focus().toggleItalic().run()}
-                    className={`p-1.5 rounded ${editor.isActive('italic') ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                    className={`p-1.5 rounded ${editor.isActive('italic') ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 hover:text-zinc-200'}`}
+                    title="Italic"
                   >
-                    <Italic className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-                    className={`p-1.5 rounded ${editor.isActive('heading', { level: 1 }) ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                  >
-                    <Heading1 className="w-4 h-4" />
+                    <Italic className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-                    className={`p-1.5 rounded ${editor.isActive('heading', { level: 2 }) ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                    className={`p-1.5 rounded ${editor.isActive('heading', { level: 2 }) ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 hover:text-zinc-200'}`}
+                    title="Heading 2"
                   >
-                    <Heading2 className="w-4 h-4" />
+                    <Heading2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+                    className={`p-1.5 rounded ${editor.isActive('heading', { level: 3 }) ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 hover:text-zinc-200'}`}
+                    title="Heading 3"
+                  >
+                    <Heading3 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => editor.chain().focus().toggleBulletList().run()}
-                    className={`p-1.5 rounded ${editor.isActive('bulletList') ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                    className={`p-1.5 rounded ${editor.isActive('bulletList') ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 hover:text-zinc-200'}`}
+                    title="Bullet list"
                   >
-                    <List className="w-4 h-4" />
+                    <List className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => editor.chain().focus().toggleOrderedList().run()}
-                    className={`p-1.5 rounded ${editor.isActive('orderedList') ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                    className={`p-1.5 rounded ${editor.isActive('orderedList') ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 hover:text-zinc-200'}`}
+                    title="Numbered list"
                   >
-                    <ListOrdered className="w-4 h-4" />
+                    <ListOrdered className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => editor.chain().focus().toggleBlockquote().run()}
-                    className={`p-1.5 rounded ${editor.isActive('blockquote') ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                    className={`p-1.5 rounded ${editor.isActive('blockquote') ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 hover:text-zinc-200'}`}
+                    title="Blockquote"
                   >
-                    <Quote className="w-4 h-4" />
+                    <Quote className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={handleInsertImage}
-                    className="p-1.5 rounded text-slate-400 hover:text-white"
-                    title="Insert WebP image from /uploads"
+                    onClick={handleInsertEditorImage}
+                    className="p-1.5 rounded text-zinc-400 hover:text-zinc-200"
+                    title="Insert Image"
                   >
-                    <ImageIcon className="w-4 h-4" />
+                    <ImageIcon className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <div className="p-6 min-h-[350px] text-slate-200">
+              )}
+
+              {/* Tiptap Canvas */}
+              {editor && (
+                <div className="min-h-[450px]">
                   <EditorContent editor={editor} />
                 </div>
-              </div>
-            )}
-
-            {editorMode === 'markdown' && (
-              <div className="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/30 flex flex-col">
-                <textarea
-                  rows={18}
-                  value={markdownBody}
-                  onChange={(e) => {
-                    setMarkdownBody(e.target.value);
-                    if (editor) editor.commands.setContent(e.target.value);
-                  }}
-                  className="w-full p-6 bg-transparent text-slate-200 font-mono text-sm leading-relaxed outline-none resize-none"
-                  placeholder="# Enter Markdown content directly..."
-                />
-              </div>
-            )}
-
-            {editorMode === 'preview' && (
-              <div className="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900 h-[500px]">
+              )}
+            </div>
+          ) : (
+            /* ======================================================== */
+            /* Preview Canvas (Desktop & Mobile Frames)                */
+            /* ======================================================== */
+            <div className="flex-1 flex items-center justify-center p-6 bg-[#090b0e]">
+              <div
+                className={`bg-[#14171c] border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 flex flex-col ${
+                  previewViewport === 'mobile' ? 'w-[375px] h-[667px]' : 'w-full max-w-4xl h-full'
+                }`}
+              >
+                <div className="h-9 bg-[#101317] border-b border-zinc-800 px-4 flex items-center justify-between text-xs text-zinc-500 font-mono">
+                  <span>http://localhost:4321/blog/{slug}</span>
+                  <a
+                    href={`http://localhost:4321/blog/${slug}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="hover:text-zinc-300 flex items-center gap-1"
+                  >
+                    <span>Open External</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
                 <iframe
                   src={`http://localhost:4321/blog/${slug}`}
-                  title="Astro Live Preview"
-                  className="w-full h-full border-none"
+                  title="Astro Preview"
+                  className="w-full flex-1 border-none bg-[#0d0f12]"
                 />
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
-      </main>
+
+        {/* ======================================================== */}
+        {/* Post Settings Slide-Out Drawer                          */}
+        {/* ======================================================== */}
+        {isSettingsOpen && (
+          <aside className="w-80 border-l border-zinc-800/80 bg-[#14171c] p-6 overflow-y-auto space-y-6 shadow-xl shrink-0">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+              <h3 className="text-sm font-semibold text-zinc-100">Post Settings</h3>
+              <button
+                onClick={() => setIsSettingsOpen(false)}
+                className="text-zinc-500 hover:text-zinc-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* URL Slug */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-300">Post URL Slug</label>
+              <div className="flex items-center">
+                <span className="px-2.5 py-1.5 bg-[#101317] border border-r-0 border-zinc-800 rounded-l-lg text-zinc-500 text-xs font-mono">
+                  /blog/
+                </span>
+                <input
+                  type="text"
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, '-'))}
+                  className="flex-1 px-2.5 py-1.5 bg-[#101317] border border-zinc-800 rounded-r-lg text-xs font-mono text-zinc-200 outline-none focus:border-zinc-600"
+                />
+              </div>
+            </div>
+
+            {/* Publish Date */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Publish Date</span>
+              </label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full px-3 py-1.5 bg-[#101317] border border-zinc-800 rounded-lg text-xs text-zinc-200 outline-none focus:border-zinc-600"
+              />
+            </div>
+
+            {/* Author */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Author</span>
+              </label>
+              <input
+                type="text"
+                value={author}
+                onChange={(e) => setAuthor(e.target.value)}
+                className="w-full px-3 py-1.5 bg-[#101317] border border-zinc-800 rounded-lg text-xs text-zinc-200 outline-none focus:border-zinc-600"
+              />
+            </div>
+
+            {/* Tags */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Tags (comma-separated)</span>
+              </label>
+              <input
+                type="text"
+                value={tagsInput}
+                onChange={(e) => setTagsInput(e.target.value)}
+                placeholder="tech, serverless, cms"
+                className="w-full px-3 py-1.5 bg-[#101317] border border-zinc-800 rounded-lg text-xs text-zinc-200 outline-none focus:border-zinc-600"
+              />
+            </div>
+
+            {/* Excerpt */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-medium text-zinc-300">
+                <span>Excerpt</span>
+                <span className={excerpt.length > 280 ? 'text-red-400' : 'text-zinc-500'}>
+                  {excerpt.length}/280
+                </span>
+              </div>
+              <textarea
+                rows={3}
+                value={excerpt}
+                onChange={(e) => setExcerpt(e.target.value)}
+                placeholder="Write a brief preview summary..."
+                className="w-full px-3 py-1.5 bg-[#101317] border border-zinc-800 rounded-lg text-xs text-zinc-200 outline-none focus:border-zinc-600"
+              />
+            </div>
+
+            {/* Featured Image */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+                <Upload className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Feature Cover Image</span>
+              </label>
+              <input
+                type="text"
+                placeholder="/uploads/cover.webp"
+                value={coverImage}
+                onChange={(e) => setCoverImage(e.target.value)}
+                className="w-full px-3 py-1.5 bg-[#101317] border border-zinc-800 rounded-lg text-xs font-mono text-zinc-200 outline-none focus:border-zinc-600"
+              />
+              <label className="cursor-pointer block text-center py-2 px-3 rounded-lg border border-dashed border-zinc-700 hover:border-zinc-500 text-xs text-zinc-400 hover:text-zinc-200 transition-colors">
+                <span>{uploadingImage ? 'Transcoding WebP...' : 'Upload Image (Auto-WebP)'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCoverUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {/* Delete Action */}
+            <div className="pt-4 border-t border-zinc-800">
+              <button
+                type="button"
+                onClick={() => handleDelete(selectedPost.slug)}
+                className="w-full py-2 px-3 rounded-lg bg-red-950/30 border border-red-900/40 text-red-400 hover:bg-red-950/60 text-xs font-medium transition-colors"
+              >
+                Delete this post
+              </button>
+            </div>
+          </aside>
+        )}
+      </div>
     </div>
   );
 };
-
