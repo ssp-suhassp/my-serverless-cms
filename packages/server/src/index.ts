@@ -1,7 +1,10 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
+import fastifyStatic from '@fastify/static';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { PATHS } from './config';
 import { authRoutes } from './routes/auth';
 import { setupRoutes } from './routes/setup';
 import { postRoutes } from './routes/posts';
@@ -25,6 +28,15 @@ export async function buildServer(): Promise<FastifyInstance> {
     limits: {
       fileSize: 25 * 1024 * 1024,
     },
+  });
+
+  if (!fs.existsSync(PATHS.uploads)) {
+    fs.mkdirSync(PATHS.uploads, { recursive: true });
+  }
+
+  await server.register(fastifyStatic, {
+    root: PATHS.uploads,
+    prefix: '/uploads/',
   });
 
   server.get('/health', async () => {

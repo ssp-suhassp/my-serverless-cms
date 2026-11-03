@@ -3,6 +3,7 @@ import {
   getGitStatus,
   publishContent,
   getDeploymentStatus,
+  syncRemote,
 } from '../services/git';
 
 export const gitRoutes: FastifyPluginAsync = async (fastify) => {
@@ -12,6 +13,15 @@ export const gitRoutes: FastifyPluginAsync = async (fastify) => {
       return status;
     } catch (err: any) {
       return reply.status(500).send({ error: 'Failed to inspect Git status', details: err.message });
+    }
+  });
+
+  fastify.post('/sync', async (request, reply) => {
+    try {
+      const result = await syncRemote();
+      return reply.status(200).send(result);
+    } catch (err: any) {
+      return reply.status(500).send({ error: 'Failed to sync with remote', details: err.message });
     }
   });
 

@@ -3,6 +3,7 @@ import {
   processAndSaveImage,
   listMediaFiles,
   deleteMediaFile,
+  cleanupOrphanAssets,
 } from '../services/media';
 
 export const mediaRoutes: FastifyPluginAsync = async (fastify) => {
@@ -36,6 +37,14 @@ export const mediaRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
+  fastify.post('/cleanup-orphans', async () => {
+    const result = cleanupOrphanAssets();
+    return {
+      success: true,
+      ...result,
+    };
+  });
+
   fastify.delete<{ Params: { filename: string } }>('/:filename', async (request, reply) => {
     const { filename } = request.params;
     try {
@@ -46,4 +55,3 @@ export const mediaRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 };
-

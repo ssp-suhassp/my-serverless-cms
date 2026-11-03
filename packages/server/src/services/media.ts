@@ -26,12 +26,19 @@ export interface MediaItem {
   createdAt: string;
 }
 
+export interface OrphanCleanupResult {
+  removedCount: number;
+  removedFiles: string[];
+}
+
 function slugifyFilename(name: string): string {
   const nameWithoutExt = path.parse(name).name;
-  return nameWithoutExt
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)+/g, '') || 'image';
+  return (
+    nameWithoutExt
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '') || 'image'
+  );
 }
 
 export async function processAndSaveImage(
@@ -62,8 +69,8 @@ export async function processAndSaveImage(
     filename,
     path: publicUrl,
     url: publicUrl,
-    width: info.width,
-    height: info.height,
+    width: info.width || metadata.width,
+    height: info.height || metadata.height,
     size: info.size,
     format: 'webp',
   };
@@ -108,3 +115,50 @@ export function deleteMediaFile(filename: string): { success: boolean; filename:
   return { success: true, filename: sanitized };
 }
 
+export function cleanupOrphanAssets(): OrphanCleanupResult {
+  ensureUploadsDir();
+
+  const referencedFilenames = new Set<string>();
+
+  // 1. Scan Markdown posts
+  if (fs.existsSync(PATHS.posts)) {
+    const postFiles = fs.readdirSync(PATHS.posts).filter((f) => f.endsWith('.md'));
+    for (const file of postFiles) {
+      const content = fs.readFileSync(path.join(PATHS.posts, file), 'utf-8');
+      const matches = content.matchAll(/\/uploads\/([a-zA-Z0-9_\-\.]+\.webp)/g);
+      for (const match of matches) {
+        if (match[1]) referencedFilenames.add(match[1]);
+      }
+    }
+  }
+
+  // 2. Scan JSON pages
+  if (fs.existsSync(PATHS.pages)) {
+    const pageFiles = fs.readdirSync(PATHS.pages).filter((f) => f.endsWith('.json'));
+    for (const file of pageFiles) {
+      const content = fs.readFileSync(path.join(PATHS.pages, file), 'utf-8');
+      const matches = content.matchAll(/\/uploads\/([a-zA-Z0-9_\-\.]+\.webp)/g);
+      for (const match of matches) {
+        if (match[1]) referencedFilenames.add(match[1]);
+      }
+    }
+  }
+
+  // 3. Scan public uploads
+  const currentUploads = fs.readdirSync(PATHS.uploads).filter((f) => f.endsWith('.webp'));
+  const removedFiles: string[] = [];
+
+  for (const upload of currentUploads) {
+    if (!referencedFilenames.has(upload)) {
+      try {
+        fs.unlinkSync(path.join(PATHS.uploads, upload));
+        removedFiles.push(upload);
+      } catch {}
+    }
+  }
+
+  return {
+    removedCount: removedFiles.length,
+    removedFiles,
+  };
+}

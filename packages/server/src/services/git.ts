@@ -39,6 +39,21 @@ export interface DeploymentStatusResult {
   totalRuns: number;
 }
 
+export async function syncRemote(): Promise<{ success: boolean; message: string }> {
+  const remotes = await git.getRemotes(true);
+  const originRemote = remotes.find((r) => r.name === 'origin');
+  if (!originRemote) {
+    return { success: true, message: 'No remote origin configured. Local workspace is current.' };
+  }
+
+  try {
+    await git.pull('origin', 'main', { '--rebase': 'true' });
+    return { success: true, message: 'Successfully synced and rebased against origin/main.' };
+  } catch (err: any) {
+    throw new Error(`Sync failed: ${err.message}`);
+  }
+}
+
 export async function getGitStatus(): Promise<GitEngineStatus> {
   const remotes = await git.getRemotes(true);
   const hasOrigin = remotes.some((r) => r.name === 'origin');

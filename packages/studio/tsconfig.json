@@ -4,8 +4,10 @@
     "jsx": "react-jsx",
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "outDir": "./dist",
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@cms/shared": ["../shared/dist/index.d.ts"]
+    }
   },
   "include": ["src/**/*"]
 }
-
